@@ -7,7 +7,10 @@ from tf2_ros import TransformListener, Buffer
 from geometry_msgs.msg import PointStamped
 import tf2_geometry_msgs 
 import math
-
+import pcl
+import numpy as np
+import atexit
+#test
 class CloudAssemblerNode(Node):
     def __init__(self):
         super().__init__('cloud_assembler_node')
@@ -28,7 +31,8 @@ class CloudAssemblerNode(Node):
 
         # frame de référence ou odom pour avoir la pos
         self.map_frame = 'map'
-
+        self.all_points = []
+        atexit.register(self.save_to_pcd)
         self.get_logger().info('Nœud d\'assemblage de nuage de points démarré.')
 
     def scan_callback(self, msg: LaserScan):
@@ -75,9 +79,11 @@ class CloudAssemblerNode(Node):
             ])
 
         if not points_world:
-            return 
-        # message pour le topic PointCloud2
+            return
 
+        self.all_points.extend(points_world)
+
+        # message pour le topic PointCloud2
         cloud_header = msg.header
         cloud_header.frame_id = self.map_frame 
 
@@ -91,13 +97,37 @@ class CloudAssemblerNode(Node):
 
         self.cloud_pub.publish(cloud_msg)
 
+    def save_to_pcd(self):
+        self.get_logger().info('Fermeture... Sauvegarde du nuage de points accumulé.')
+
+        if not self.all_points:
+            self.get_logger().warn('Aucun point accumulé. Aucun fichier .pcd ne sera créé.')
+            return
+
+        # Convertir notre liste python en un nuage de points PCL
+        cloud_array = np.array(self.all_points, dtype=np.float32)
+
+        pcd_cloud = pcl.PointCloud()
+        pcd_cloud.from_array(cloud_array)
+
+        try:
+            filename = 'my_dense_cloud.pcd'
+            pcl.save(pcd_cloud, filename)
+            self.get_logger().info(f'Nuage de points dense sauvegardé dans {filename}!')
+            self.get_logger().info(f'Total des points: {len(self.all_points)}')
+        except Exception as e:
+            self.get_logger().error(f'Impossible de sauvegarder le fichier .pcd: {e}')
 
 def main(args=None):
     rclpy.init(args=args)
     node = CloudAssemblerNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info('Arrêt manuel demandé.')
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
