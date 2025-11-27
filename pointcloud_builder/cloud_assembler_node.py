@@ -10,6 +10,9 @@ import math
 import pcl
 import numpy as np
 import atexit
+from datetime import datetime
+import os
+
 #test
 class CloudAssemblerNode(Node):
     def __init__(self):
@@ -101,7 +104,7 @@ class CloudAssemblerNode(Node):
         self.get_logger().info('Fermeture... Sauvegarde du nuage de points accumulé.')
 
         if not self.all_points:
-            self.get_logger().warn('Aucun point accumulé. Aucun fichier .pcd ne sera créé.')
+                self.get_logger().warn('Aucun point accumulé. Aucun fichier .pcd ne sera créé.')
             return
 
         # Convertir notre liste python en un nuage de points PCL
@@ -111,13 +114,14 @@ class CloudAssemblerNode(Node):
         pcd_cloud.from_array(cloud_array)
 
         try:
-            filename = 'my_dense_cloud.pcd'
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f'scan_{timestamp}.pcd'
             pcl.save(pcd_cloud, filename)
-            self.get_logger().info(f'Nuage de points dense sauvegardé dans {filename}!')
+
+            self.get_logger().info(f'Nuage de points dense sauvegard� dans {filename}!')
             self.get_logger().info(f'Total des points: {len(self.all_points)}')
         except Exception as e:
             self.get_logger().error(f'Impossible de sauvegarder le fichier .pcd: {e}')
-
 def main(args=None):
     rclpy.init(args=args)
     node = CloudAssemblerNode()
