@@ -153,12 +153,25 @@ def generate_launch_description():
         ],
         output='screen'
     )
+    map_path = os.path.join(pkg_pointcloud_builder, 'maps', 'fr_campus.bt')
+    octomap_server = Node(
+        package='octomap_server',
+        executable='octomap_server_node',
+        name='octomap_server',
+        output='screen',
+        parameters=[{
+            'frame_id': 'map',
+            'octomap_path': map_path,
+            'height_map': True
+        }]
+    )
 
     ld = LaunchDescription()
     for var in set_env_vars:
         ld.add_action(var)
     ld.add_action(planner)
-    ld.add_action(robot_state_publisher)
+    ld.add_action(octomap_server)
+    ld.add_action(robot_state_publisher)  #se truck marche pas :(
     ld.add_action(goal)
     ld.add_action(rviz2)
     ld.add_action(gazebo_sim)
