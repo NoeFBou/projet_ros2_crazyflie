@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from typing import Optional, List
-
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
