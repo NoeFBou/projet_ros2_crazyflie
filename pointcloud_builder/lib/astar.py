@@ -1,7 +1,7 @@
 import math
 import heapq
 from typing import Dict, List, Optional, Set, Tuple
-from octomap_planning_test.lib.octomap_reader import OctomapReader
+from pointcloud_builder.lib.octomap_reader import OctomapReader
 
 GridIdx = Tuple[int, int, int]
 

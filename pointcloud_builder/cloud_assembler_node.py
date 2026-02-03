@@ -104,7 +104,7 @@ class CloudAssemblerNode(Node):
         self.get_logger().info('Fermeture... Sauvegarde du nuage de points accumulé.')
 
         if not self.all_points:
-                self.get_logger().warn('Aucun point accumulé. Aucun fichier .pcd ne sera créé.')
+            self.get_logger().warn('Aucun point accumulé. Aucun fichier .pcd ne sera créé.')
             return
 
         # Convertir notre liste python en un nuage de points PCL
@@ -118,7 +118,7 @@ class CloudAssemblerNode(Node):
             filename = f'scan_{timestamp}.pcd'
             pcl.save(pcd_cloud, filename)
 
-            self.get_logger().info(f'Nuage de points dense sauvegard� dans {filename}!')
+            self.get_logger().info(f'Nuage de points dense sauvegard� dans {filename}!')
             self.get_logger().info(f'Total des points: {len(self.all_points)}')
         except Exception as e:
             self.get_logger().error(f'Impossible de sauvegarder le fichier .pcd: {e}')
