@@ -2,7 +2,7 @@ import math
 import heapq
 from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
-from octomap_planning_test.lib.minimum_snap import Waypoint, generate_trajectory, compute_quadrotor_trajectory
+from octomap_planning_test.lib.minimum_snap import Waypoint, compute_trajectory_derivatives,generate_trajectory, compute_quadrotor_trajectory
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -15,7 +15,8 @@ from visualization_msgs.msg import Marker
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from rcl_interfaces.msg import SetParametersResult
-
+from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
+from geometry_msgs.msg import Transform, Twist, Vector3, Quaternion
 from octomap_planning_test.lib.astar import AStar
 from octomap_planning_test.lib.octomap_reader import OctomapReader
 
@@ -87,7 +88,7 @@ class Planner(Node):
         self.path_verified_basic = self.create_publisher(Path, "planned_path_Snaped_verif", latching_qos)
         self.marker_pub_verif = self.create_publisher(Marker, "planned_path_marker_snaped_verif", latching_qos)
 
-        #self.path_snaped_sfc = self.create_publisher(Path, "planned_path_astar_Snaped_sfc", latching_qos)
+        self.traj_pub = self.create_publisher(MultiDOFJointTrajectory, "planned_trajectory_final", latching_qos)
 
         self.occupied: Set[GridIdx] = set()
         self.occupied_inflated: Set[GridIdx] = set()
@@ -233,14 +234,14 @@ class Planner(Node):
         self._publish_grid_path(path_pruned, self.path_pruned, self.marker_pub_pruned, ns="pruned", color=(1.0, 1.0, 0.0))
 
         waypoints = self._path_to_timed_waypoints(path_pruned) #path_pruned
-        path_snaped = self.waypoint_to_trajectory(waypoints) #tmp
+        path_snaped, _, _ = self.waypoint_to_trajectory(waypoints) #tmp
 
         self.get_logger().info(f"Trajectory generated: {len(path_snaped.position)} samples")
         self._publish_trajectory(path_snaped, self.path_snaped_basic, self.marker_pub_snaped, ns="snaped", color=(0.0, 1.0, 0.0))
 
 
         max_retries = 50
-        path_verified = self.waypoint_to_trajectory(waypoints)
+        path_verified, t_samples, acceleration = self.waypoint_to_trajectory(waypoints)
         for attempt in range(max_retries):
             is_safe, waypoints = self._check_and_repair(path_verified, waypoints, path_astar)
             if is_safe:
@@ -249,12 +250,12 @@ class Planner(Node):
             else:
                 if attempt == max_retries - 1:
                     self.get_logger().error("Max retries reached. Trajectory might be unsafe.")
-            path_verified = self.waypoint_to_trajectory(waypoints)
+            path_verified, t_samples, acceleration = self.waypoint_to_trajectory(waypoints)
 
         self.get_logger().info(f"Trajectory generated: {len(path_verified.position)} samples")
         self._publish_trajectory(path_verified, self.path_verified_basic, self.marker_pub_verif, ns="verif", color=(0.0, 1.0, 1.0))
 
-
+        self.publish_final_trajectory(path_verified,t_samples, acceleration)
 
 
     def _check_and_repair(self, quad_traj, current_waypoints: List[Waypoint], raw_astar_path: List[GridIdx]) -> Tuple[bool, List[Waypoint]]:
@@ -361,8 +362,17 @@ class Planner(Node):
             t_samples,
             vehicle_mass=self.get_parameter("drone_mass").value
         )
+        #[positions, attitudes, velocities]
+        #attitude = [qx, qy, qz, qw]
+        #self.get_logger().info(f"Test={quad_traj.velocity}")
 
-        return quad_traj
+
+        #accelration
+        derivatives = compute_trajectory_derivatives(traj_poly, t_samples, 4)
+        #[Pos, Vel, Acc, Jerk]
+        acceleration = derivatives[2]
+
+        return quad_traj, t_samples, acceleration
 
     def _publish_grid_path(self, grid_path, path_pub, marker_pub, ns, color):
         world_points = [self.map_reader.grid_to_world(idx) for idx in grid_path]
@@ -407,6 +417,52 @@ class Planner(Node):
             marker.points.append(pt)
 
         marker_pub.publish(marker)
+
+    def publish_final_trajectory(self,quad_traj, timestamps, acceleration):
+        traj = MultiDOFJointTrajectory()
+        traj.header.stamp = self.get_clock().now().to_msg()
+        traj.header.frame_id = self.get_parameter("frame_id").value
+        traj.joint_names=["base_footprint"] #base_link test
+
+        for i, t in enumerate(timestamps):
+            point = MultiDOFJointTrajectoryPoint()
+            point.time_from_start = rclpy.duration.Duration(seconds=t).to_msg()
+
+            trans = Transform()
+            trans.translation.x = float(quad_traj.position[i][0])
+            trans.translation.y = float(quad_traj.position[i][1])
+            trans.translation.z = float(quad_traj.position[i][2])
+
+            trans.rotation.x = float(quad_traj.attitude[i][0])
+            trans.rotation.y = float(quad_traj.attitude[i][1])
+            trans.rotation.z = float(quad_traj.attitude[i][2])
+            trans.rotation.w = float(quad_traj.attitude[i][3])
+
+            point.transforms.append(trans)
+
+            vel = Twist()
+            vel.linear.x = float(quad_traj.velocity[i][0])
+            vel.linear.y = float(quad_traj.velocity[i][1])
+            vel.linear.z = float(quad_traj.velocity[i][2])
+
+            vel.angular.x = float(quad_traj.body_rates[i][0])
+            vel.angular.y = float(quad_traj.body_rates[i][1])
+            vel.angular.z = float(quad_traj.body_rates[i][2])
+
+            point.velocities.append(vel)
+
+            acc = Twist()
+            acc.linear.x = float(acceleration[i][0])
+            acc.linear.y = float(acceleration[i][1])
+            acc.linear.z = float(acceleration[i][2])
+
+            point.accelerations.append(acc)
+
+            traj.points.append(point)
+
+        self.traj_pub.publish(traj)
+        self.get_logger().info("Trajectory published")
+
 
 def main():
     rclpy.init()

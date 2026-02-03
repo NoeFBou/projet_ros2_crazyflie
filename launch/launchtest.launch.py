@@ -171,7 +171,7 @@ def generate_launch_description():
         ld.add_action(var)
     ld.add_action(planner)
     ld.add_action(octomap_server)
-    ld.add_action(robot_state_publisher)  #se truck marche pas :(
+    #ld.add_action(robot_state_publisher)  #se truck marche pas :(
     ld.add_action(goal)
     ld.add_action(rviz2)
     ld.add_action(gazebo_sim)
