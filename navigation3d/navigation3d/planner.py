@@ -2,7 +2,7 @@ import math
 import heapq
 from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
-from pointcloud_builder.lib.minimum_snap import Waypoint, compute_trajectory_derivatives,generate_trajectory, compute_quadrotor_trajectory
+from navigation3d.lib.minimum_snap import Waypoint, compute_trajectory_derivatives,generate_trajectory, compute_quadrotor_trajectory
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
@@ -17,8 +17,8 @@ from sensor_msgs_py import point_cloud2
 from rcl_interfaces.msg import SetParametersResult
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from geometry_msgs.msg import Transform, Twist, Vector3, Quaternion
-from pointcloud_builder.lib.astar import AStar
-from pointcloud_builder.lib.octomap_reader import OctomapReader
+from navigation3d.lib.astar import AStar
+from navigation3d.lib.octomap_reader import OctomapReader
 
 # todo voir  Ramer-Douglas-Peucker
 

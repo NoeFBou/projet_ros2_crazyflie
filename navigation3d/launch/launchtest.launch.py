@@ -13,7 +13,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    pkg_pointcloud_builder = get_package_share_directory('pointcloud_builder')
+    pkg_navigation3d = get_package_share_directory('navigation3d')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_crazyflie_bringup = get_package_share_directory('ros_gz_crazyflie_bringup')
 
@@ -35,11 +35,11 @@ def generate_launch_description():
     else:
         print(f"Fichier SDF trouve")
 
-    params = os.path.join(pkg_pointcloud_builder, 'config', 'planner.yaml')
-    rviz_config_file = os.path.join(pkg_pointcloud_builder, 'rviz', 'config.rviz')
-    world_path = os.path.join(pkg_pointcloud_builder, 'worlds', 'oui.sdf')
+    params = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
+    rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config.rviz')
+    world_path = os.path.join(pkg_navigation3d, 'worlds', 'oui.sdf')
     resource_paths = [
-        os.path.join(pkg_pointcloud_builder, 'worlds'), ':',
+        os.path.join(pkg_navigation3d, 'worlds'), ':',
         os.path.join(pkg_crazyflie_bringup, 'models'), ':',
         models_parent_dir
     ]
@@ -117,7 +117,7 @@ def generate_launch_description():
     )
 
     planner = Node(
-        package="pointcloud_builder",
+        package="navigation3d",
         executable="planner",
         name="planner",
         output="screen",
@@ -125,7 +125,7 @@ def generate_launch_description():
     )
 
     goal = Node(
-        package="pointcloud_builder",
+        package="navigation3d",
         executable="goal_manager",
         name="goal_manager",
         output="screen",
@@ -153,7 +153,7 @@ def generate_launch_description():
         ],
         output='screen'
     )
-    map_path = os.path.join(pkg_pointcloud_builder, 'maps', 'fr_campus.bt')
+    map_path = os.path.join(pkg_navigation3d, 'maps', 'fr_campus.bt')
     octomap_server = Node(
         package='octomap_server',
         executable='octomap_server_node',

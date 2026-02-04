@@ -2,7 +2,7 @@ launch traj :
 cd ~/crazyflie_ws/
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 launch pointcloud_builder launchtest.launch.py
+ros2 launch navigation3d launchtest.launch.py
 
 teleop
 cd ~/crazyflie_ws/

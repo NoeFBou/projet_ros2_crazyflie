@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = 'pointcloud_builder'
+package_name = 'navigation3d'
 
 setup(
     name=package_name,
@@ -26,11 +26,8 @@ setup(
     license='TODO: License declaration',
     entry_points={
         'console_scripts': [
-            'cloud_assembler = pointcloud_builder.cloud_assembler_node:main',
-            'PlyPublisher = pointcloud_builder.PlyPublisher:main',
-            'CustomAMCL = pointcloud_builder.CustomAMCL:main',
-            'planner = pointcloud_builder.planner:main',
-            'goal_manager = pointcloud_builder.goal_manager:main',
+            'planner = navigation3d.planner:main',
+            'goal_manager = navigation3d.goal_manager:main',
         ],
     },
 )
