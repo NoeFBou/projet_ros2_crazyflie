@@ -44,6 +44,8 @@ class Planner(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.declare_parameter("world_frame", "map")
         self.declare_parameter("robot_frame", "crazyflie/base_footprint")
+        self.declare_parameter("goal_topic", "/goal_pose")
+        self.declare_parameter("force_goal_z", -1.0)
         # self.frame_id = self.get_parameter("frame_id").value
         # self.step = 5
         # qos_sub = QoSProfile(
@@ -67,8 +69,15 @@ class Planner(Node):
         self.occ_sub = self.create_subscription(
             PointCloud2,
             self.get_parameter("occupied_cloud_topic").value,
-            self._on_cloud_callback,
+            self._occupied_cloud_callback,
             qos_map,
+        )
+
+        self.goal_sub = self.create_subscription(
+            PoseStamped,
+            self.get_parameter("goal_topic").value,
+            self._goal_callback,
+            10
         )
 
         latching_qos = QoSProfile(
@@ -76,16 +85,16 @@ class Planner(Node):
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
         )
 
-        self.path_basic = self.create_publisher(Path, "planned_path_astar_basic", latching_qos)
+        # self.path_basic = self.create_publisher(Path, "planned_path_astar_basic", latching_qos)
         self.marker_pub_basic = self.create_publisher(Marker, "planned_path_marker", latching_qos)
 
-        self.path_pruned = self.create_publisher(Path, "planned_path_astar_pruned", latching_qos)
+        # self.path_pruned = self.create_publisher(Path, "planned_path_astar_pruned", latching_qos)
         self.marker_pub_pruned = self.create_publisher(Marker, "planned_path_marker_pruned", latching_qos)
 
-        self.path_snaped_basic = self.create_publisher(Path, "planned_path_astar_Snaped_basic", latching_qos)
+        # self.path_snaped_basic = self.create_publisher(Path, "planned_path_astar_Snaped_basic", latching_qos)
         self.marker_pub_snaped = self.create_publisher(Marker, "planned_path_marker_snaped", latching_qos)
 
-        self.path_verified_basic = self.create_publisher(Path, "planned_path_Snaped_verif", latching_qos)
+        # self.path_verified_basic = self.create_publisher(Path, "planned_path_Snaped_verif", latching_qos)
         self.marker_pub_verif = self.create_publisher(Marker, "planned_path_marker_snaped_verif", latching_qos)
 
         self.traj_pub = self.create_publisher(MultiDOFJointTrajectory, "planned_trajectory_final", latching_qos)
@@ -104,7 +113,7 @@ class Planner(Node):
         self.add_on_set_parameters_callback(self._on_params)
         self.get_logger().info("Planner started. Waiting for occupied cloud...")
 
-    def _on_cloud_callback(self, msg: PointCloud2):
+    def _occupied_cloud_callback(self, msg: PointCloud2):
         self.get_logger().info("Map received, updating grid...")
         self.map_reader.update_map(msg)
         self.map_ready = True
@@ -118,6 +127,7 @@ class Planner(Node):
 
 
     #plan or replan when goal/grid are set or change
+    #tmp
     def _on_params(self, params: List[Parameter]):
         updated = False
 
@@ -129,7 +139,7 @@ class Planner(Node):
                 self.current_goal = p.value
                 updated = True
             elif p.name == "grid_res" or p.name == "inflation" or p.name=="bbox_margin":
-                #todo
+
                 pass
 
         if updated and self.map_ready:
@@ -169,6 +179,30 @@ class Planner(Node):
         except (LookupException, ConnectivityException, ExtrapolationException) as e:
             self.get_logger().warn(f"Impossible de récupérer la position du drone: {e}")
             return None
+
+    def _goal_callback(self, msg: PoseStamped):
+
+        x = msg.pose.position.x
+        y = msg.pose.position.y
+        z = msg.pose.position.z
+
+        force_z = self.get_parameter("force_goal_z").value
+
+        if force_z > 0.0:
+            z = force_z
+        elif abs(z) < 0.01:
+            default_goal = self.get_parameter("goal").value
+            z = default_goal[2]
+            self.get_logger().info(f"goal z is <0 remplacement by {z}")
+
+        self.current_goal = [x, y, z]
+        self.get_logger().info(f"new goal : {self.current_goal}")
+
+        if self.map_ready:
+            self.planner()
+        else:
+            self.get_logger().warn("map not ready yet")
+
 
     def _prune_path(self, path: List[GridIdx]) -> List[GridIdx]:
         if len(path) < 3: return path
@@ -227,17 +261,17 @@ class Planner(Node):
 
 
         self.get_logger().info(f"A* found: {len(path_astar)} voxels")
-        self._publish_grid_path(path_astar, self.path_basic, self.marker_pub_basic, ns="basic", color=(1.0, 0.0, 0.0))
+        self._publish_grid_path(path_astar,  self.marker_pub_basic, ns="basic", color=(1.0, 0.0, 0.0))
 
         path_pruned = self._prune_path(path_astar)
         self.get_logger().info(f"Pruned: {len(path_pruned)} waypoints")
-        self._publish_grid_path(path_pruned, self.path_pruned, self.marker_pub_pruned, ns="pruned", color=(1.0, 1.0, 0.0))
+        self._publish_grid_path(path_pruned, self.marker_pub_pruned, ns="pruned", color=(1.0, 1.0, 0.0))
 
         waypoints = self._path_to_timed_waypoints(path_pruned) #path_pruned
         path_snaped, _, _ = self.waypoint_to_trajectory(waypoints) #tmp
 
         self.get_logger().info(f"Trajectory generated: {len(path_snaped.position)} samples")
-        self._publish_trajectory(path_snaped, self.path_snaped_basic, self.marker_pub_snaped, ns="snaped", color=(0.0, 1.0, 0.0))
+        self._publish_trajectory(path_snaped, self.marker_pub_snaped, ns="snaped", color=(0.0, 1.0, 0.0))
 
 
         max_retries = 50
@@ -253,7 +287,7 @@ class Planner(Node):
             path_verified, t_samples, acceleration = self.waypoint_to_trajectory(waypoints)
 
         self.get_logger().info(f"Trajectory generated: {len(path_verified.position)} samples")
-        self._publish_trajectory(path_verified, self.path_verified_basic, self.marker_pub_verif, ns="verif", color=(0.0, 1.0, 1.0))
+        self._publish_trajectory(path_verified,  self.marker_pub_verif, ns="verif", color=(0.0, 1.0, 1.0))
 
         self.publish_final_trajectory(path_verified,t_samples, acceleration)
 
@@ -374,16 +408,16 @@ class Planner(Node):
 
         return quad_traj, t_samples, acceleration
 
-    def _publish_grid_path(self, grid_path, path_pub, marker_pub, ns, color):
+    def _publish_grid_path(self, grid_path, marker_pub, ns, color):
         world_points = [self.map_reader.grid_to_world(idx) for idx in grid_path]
-        self._publish_visuals(world_points, path_pub, marker_pub, ns, color)
+        self._publish_visuals(world_points, marker_pub, ns, color)
 
-    def _publish_trajectory(self, quad_traj, path_pub, marker_pub, ns, color):
+    def _publish_trajectory(self, quad_traj, marker_pub, ns, color):
         # quad_traj.position est un numpy array (N, 3)
         points = quad_traj.position.tolist()
-        self._publish_visuals(points, path_pub, marker_pub, ns, color)
+        self._publish_visuals(points, marker_pub, ns, color)
 
-    def _publish_visuals(self, points_xyz, path_pub, marker_pub, ns, color):
+    def _publish_visuals(self, points_xyz, marker_pub, ns, color):
         frame_id = self.get_parameter("frame_id").value
         now = self.get_clock().now().to_msg()
 
@@ -398,9 +432,8 @@ class Planner(Node):
             ps.pose.orientation.w = 1.0
             msg_path.poses.append(ps)
 
-        path_pub.publish(msg_path)
+        # path_pub.publish(msg_path)
 
-        # 2. Message Marker (Ligne)
         marker = Marker()
         marker.header = msg_path.header
         marker.ns = ns
