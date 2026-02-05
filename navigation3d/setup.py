@@ -28,6 +28,7 @@ setup(
         'console_scripts': [
             'planner = navigation3d.planner:main',
             'goal_manager = navigation3d.goal_manager:main',
+            'trajectories_follower = navigation3d.trajectories_follower:main',
         ],
     },
 )
