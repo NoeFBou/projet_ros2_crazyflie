@@ -28,6 +28,7 @@ setup(
 		'save_cloud = crazyflie_manual_3dcarto.save_points_cloud:main',
         	'scan_to_pcd = crazyflie_manual_3dcarto.scan_to_pcd:main',
         	'teleop_save = crazyflie_manual_3dcarto.teleop_save:main',
+            'interactive_goal = crazyflie_manual_3dcarto.interactive_marker_pose_stamped:main',
         ],
     },
 )
