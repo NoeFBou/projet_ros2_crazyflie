@@ -2,23 +2,21 @@ import math
 import heapq
 from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
-from navigation3d.lib.minimum_snap import Waypoint, compute_trajectory_derivatives,generate_trajectory, compute_quadrotor_trajectory
 import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
-
 from nav_msgs.msg import Path
-from geometry_msgs.msg import PoseStamped, Point
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from rcl_interfaces.msg import SetParametersResult
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
-from geometry_msgs.msg import Transform, Twist, Vector3, Quaternion
+from geometry_msgs.msg import Transform, Twist, Vector3, Quaternion, PoseStamped, Point
 from navigation3d.lib.astar import AStar
 from navigation3d.lib.octomap_reader import OctomapReader
+from navigation3d.lib.minimum_snap import Waypoint, compute_trajectory_derivatives,generate_trajectory, compute_quadrotor_trajectory
 
 # todo voir  Ramer-Douglas-Peucker
 

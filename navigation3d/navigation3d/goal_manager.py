@@ -7,15 +7,8 @@ from rclpy.parameter import Parameter
 from geometry_msgs.msg import PointStamped
 from rcl_interfaces.srv import SetParameters
 
-
+#tmp
 class GoalManager(Node):
-    """
-    Listens to RViz /clicked_point and sets start/goal params on the planner node.
-
-    Modes:
-      - mode = "goal_only": each click sets goal; start stays fixed (param or from odom later)
-      - mode = "two_click": first click sets start, second click sets goal, then alternates
-    """
 
     def __init__(self) -> None:
         super().__init__("goal_manager")

@@ -157,7 +157,7 @@ class TrajectoriesFollower(Node):
             kz * pos_err[2]
         ])
 
-        # 3. Erreur de Yaw
+        # Erreur de Yaw
         yaw_err = point_drone_dir - curr_yaw
         yaw_err = math.atan2(math.sin(yaw_err), math.cos(yaw_err)) # Normalisation -pi, pi
 

@@ -166,6 +166,14 @@ def generate_launch_description():
         }]
     )
 
+    # trajectories_follower = Node(
+    #     package='navigation3d',
+    #     executable='trajectories_follower',
+    #     name='trajectories_follower',
+    #     output='screen',
+    #     parameters=[params],
+    # )
+
     ld = LaunchDescription()
     for var in set_env_vars:
         ld.add_action(var)
@@ -179,4 +187,5 @@ def generate_launch_description():
     ld.add_action(control)
     ld.add_action(simple_mapper)
     ld.add_action(spawn_robot)
+    #ld.add_action(trajectories_follower)
     return ld
