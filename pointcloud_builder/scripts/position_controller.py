@@ -22,14 +22,14 @@ class PositionController(Node):
 
 
         # --- Paramètres du Contrôleur (Gains P) ---
-        self.P_GAIN_XY = 0.5
-        self.P_GAIN_Z = 0.8
-        self.P_GAIN_YAW = 0.6
+        self.P_GAIN_XY = 0.25  
+        self.P_GAIN_Z = 0.5   
+        self.P_GAIN_YAW = 0.5  
 
         # --- Limites de Vitesse  ---
-        self.MAX_SPEED_XY = 0.3
-        self.MAX_SPEED_Z = 0.6
-        self.MAX_SPEED_YAW = 0.5
+        self.MAX_SPEED_XY = 0.15  
+        self.MAX_SPEED_Z = 0.4    
+        self.MAX_SPEED_YAW = 0.4 
 
         # --- Seuil de Précision ---
         self.WAYPOINT_THRESHOLD_POS = 0.3 # 30cm
