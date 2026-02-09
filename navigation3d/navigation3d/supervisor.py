@@ -3,13 +3,11 @@ import rclpy
 from rclpy.node import Node
 from py_trees_ros import trees
 from py_trees.common import Status
-from navigation3d.navigation3d.behavior.action import WaitGoal, TrajectoriesPlanner
-from navigation3d.navigation3d.behavior.test import TakeOff
+from navigation3d.behavior.action import WaitGoal, TrajectoriesPlanner, FollowTrajectoryBehavior,ChangeHeight
 
 class Supervisor(Node):
     def __init__(self):
         super().__init__('supervisor')
-        self.declare_parameter("topic_name","/target_pose")
         self.declare_parameter("topic_name","/target_pose")
 
     def setup_tree(self) :
@@ -24,13 +22,14 @@ class Supervisor(Node):
 
         wait_goal = WaitGoal()
         trajectory = TrajectoriesPlanner()
-        check_battey_trajectory = CheckBatteryTrajectory()
-        takeoff = TakeOff(height = 0.5)
-        follow_trajectory = FollowTrajectory()
-        land = TakeOff(height = 0.05)
+        #check_battey_trajectory = CheckBatteryTrajectory()
+        takeoff = ChangeHeight(height = 0.5)
+        follow_trajectory = FollowTrajectoryBehavior(name="Follow Trajectory")
+        land = ChangeHeight(height = 0.05)
 
 
-        navigation_battery.add_child(wait_goal,trajectory,check_battey_trajectory, takeoff, follow_trajectory,land)
+        navigation_branch.add_children([wait_goal,trajectory, #check_battey_trajectory
+                                     takeoff, follow_trajectory,land])
 
         root.add_child(navigation_branch)
         return root

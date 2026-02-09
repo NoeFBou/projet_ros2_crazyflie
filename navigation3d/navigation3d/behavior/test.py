@@ -3,12 +3,13 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 import py_trees
 from py_trees.common import Status
+from rclpy.action import ActionClient
 from tf2_ros import Buffer, TransformListener, LookupException
 
 class TakeOff(py_trees.behaviour.Behaviour):
-    def __init__(self, name="Take Off", target_height=1.0, threshold=0.1): #10cm
+    def __init__(self, name="Take Off", height=1.0, threshold=0.1): #10cm
         super(TakeOff, self).__init__(name)
-        self.target_height = target_height #m
+        self.target_height = height #m
         self.threshold = threshold
 
         self.node = None

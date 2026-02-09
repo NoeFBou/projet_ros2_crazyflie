@@ -1,11 +1,16 @@
 import math
+import time
 import numpy as np
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from trajectory_msgs.msg import MultiDOFJointTrajectory
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 import tf_transformations
+from navigation3d.action import FollowTrajectory
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 class TrajectoriesFollower(Node):
     def __init__(self):
@@ -19,42 +24,34 @@ class TrajectoriesFollower(Node):
         self.declare_parameter("kp_yaw", 1.0)
         self.declare_parameter("max_speed", 1.0)
         self.declare_parameter("period", 0.02) # 0.02 = 50Hz
-
+        self._action_cb_group = ReentrantCallbackGroup()
         self.trajectory = None
         self.start_time = None
-        self.tracking_active = False
+        # self.tracking_active = False
         self.index_lst_point=0
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        self.sub_traj = self.create_subscription(
-            MultiDOFJointTrajectory,
-            self.get_parameter("traj_topic").value,
-            self.traj_callback,
-            10
-        )
+        self._action_server = ActionServer(
+            self,
+            FollowTrajectory,
+            'follow_trajectory',
+            self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=self._action_cb_group)
+
         self.pub_cmd = self.create_publisher(Twist, self.get_parameter("cmd_vel_topic").value, 10)
 
-        self.timer = self.create_timer(self.get_parameter("period").value, self.control_loop)
+    def goal_callback(self, goal_request):
+        self.get_logger().info('new trajectory')
+        return GoalResponse.ACCEPT
 
-    def traj_callback(self, msg: MultiDOFJointTrajectory):
-        self.get_logger().info(f"Received trajectory")
-        self.trajectory = msg
-        self.start_time = self.get_clock().now()
-        self.tracking_active = True
-        self.index_lst_point = 0
-
-    def get_drone_state(self):
-        try:
-            t = self.tf_buffer.lookup_transform("map", self.get_parameter("robot_frame").value, rclpy.time.Time())
-            pos = np.array([t.transform.translation.x, t.transform.translation.y, t.transform.translation.z])
-            q = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
-            _, _, yaw = tf_transformations.euler_from_quaternion(q)
-            return pos, yaw
-
-        except (LookupException, ConnectivityException, ExtrapolationException):
-            return None, None
+    def cancel_callback(self, goal_handle):
+        self.get_logger().info('STOP')
+        self.pub_cmd.publish(Twist())
+        return CancelResponse.ACCEPT
 
     def get_point_at_time(self, time_from_start_sec):
 
@@ -122,77 +119,122 @@ class TrajectoriesFollower(Node):
 
         return (point_position, point_velocities, point_drone_dir, point_drone_dir_rot, point_accel), finished
 
-    def control_loop(self):
-        if not self.tracking_active or self.trajectory is None:
-            return
+    def get_drone_state(self):
+        try:
+            t = self.tf_buffer.lookup_transform("map", self.get_parameter("robot_frame").value, rclpy.time.Time())
+            pos = np.array([t.transform.translation.x, t.transform.translation.y, t.transform.translation.z])
+            q = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
+            _, _, yaw = tf_transformations.euler_from_quaternion(q)
+            return pos, yaw
 
-        now = self.get_clock().now()
-        time_elapsed = (now - self.start_time).nanoseconds * 1e-9
+        except (LookupException, ConnectivityException, ExtrapolationException):
+            return None, None
 
-        setpoint, finished = self.get_point_at_time(time_elapsed)
+    async def execute_callback(self, goal_handle):
+        self.get_logger().info('Exécution de la trajectoire')
+        current_traj = goal_handle.request.trajectory
+        self.trajectory = current_traj
+        self.index_lst_point = 0
+        self.start_time = self.get_clock().now()
 
-        if finished:
-            self.pub_cmd.publish(Twist())
-            if time_elapsed > (self.trajectory.points[-1].time_from_start.sec + 2.0):
-                self.tracking_active = False
-                self.get_logger().info("Trajectory Finished.")
-            return
+        feedback_msg = FollowTrajectory.Feedback()
+        result = FollowTrajectory.Result()
+        period = self.get_parameter("period").value
+        while rclpy.ok():
 
-        point_position, point_velocities, point_drone_dir, point_drone_dir_rot, point_accel = setpoint
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                self.pub_cmd.publish(Twist()) # Stop
+                result.success = False
+                result.message = "Trajectoiry cancel"
+                return result
+            now = self.get_clock().now()
+            time_elapsed = (now - self.start_time).nanoseconds * 1e-9
 
-        curr_pos, curr_yaw = self.get_drone_state()
-        if curr_pos is None:
-            return
+            setpoint, finished = self.get_point_at_time(time_elapsed)
 
+            if finished:
+                self.pub_cmd.publish(Twist())
+                last_pt_time = self.trajectory.points[-1].time_from_start.sec + self.trajectory.points[-1].time_from_start.nanosec * 1e-9
+                if time_elapsed > (last_pt_time + 1.0):
+                    self.get_logger().info("Trajectory Finished.")
+                    goal_handle.succeed()
+                    result.success = True
+                    result.message = "Arrive"
+                    return result
+            else:
+                point_position, point_velocities, point_drone_dir, point_drone_dir_rot, point_accel = setpoint
 
-        pos_err = point_position - curr_pos
+                curr_pos, curr_yaw = self.get_drone_state()
+                if curr_pos is None:
+                    self.get_logger().warn("Perte TF", throttle_duration_sec=1.0)
+                    #self.pub_cmd.publish(Twist())
+                else:
+                    pos_err = point_position - curr_pos
 
-        # Vitesse Désirée
-        kx = self.get_parameter("kp_xy").value
-        kz = self.get_parameter("kp_z").value
+                    # Vitesse Désirée
+                    kx = self.get_parameter("kp_xy").value
+                    kz = self.get_parameter("kp_z").value
 
-        v_cmd_world = point_velocities +(point_accel * 0.1)+ np.array([
-            kx * pos_err[0],
-            kx * pos_err[1],
-            kz * pos_err[2]
-        ])
+                    v_cmd_world = point_velocities +(point_accel * 0.1)+ np.array([
+                        kx * pos_err[0],
+                        kx * pos_err[1],
+                        kz * pos_err[2]
+                    ])
 
-        # Erreur de Yaw
-        yaw_err = point_drone_dir - curr_yaw
-        yaw_err = math.atan2(math.sin(yaw_err), math.cos(yaw_err)) # Normalisation -pi, pi
+                    # Erreur de Yaw
+                    yaw_err = point_drone_dir - curr_yaw
+                    yaw_err = math.atan2(math.sin(yaw_err), math.cos(yaw_err)) # Normalisation -pi, pi
 
-        yaw_cmd = point_drone_dir_rot + self.get_parameter("kp_yaw").value * yaw_err
+                    yaw_cmd = point_drone_dir_rot + self.get_parameter("kp_yaw").value * yaw_err
 
-        c = math.cos(curr_yaw)
-        s = math.sin(curr_yaw)
+                    c = math.cos(curr_yaw)
+                    s = math.sin(curr_yaw)
 
-        v_x_body =  c * v_cmd_world[0] + s * v_cmd_world[1]
-        v_y_body = -s * v_cmd_world[0] + c * v_cmd_world[1]
-        v_z_body = v_cmd_world[2]
+                    v_x_body =  c * v_cmd_world[0] + s * v_cmd_world[1]
+                    v_y_body = -s * v_cmd_world[0] + c * v_cmd_world[1]
+                    v_z_body = v_cmd_world[2]
 
-        # secu
-        max_v = self.get_parameter("max_speed").value
-        norm_xy = math.sqrt(v_x_body**2 + v_y_body**2)
-        if norm_xy > max_v:
-            scale = max_v / norm_xy
-            v_x_body *= scale
-            v_y_body *= scale
+                    # secu
+                    max_v = self.get_parameter("max_speed").value
+                    norm_xy = math.sqrt(v_x_body**2 + v_y_body**2)
+                    if norm_xy > max_v:
+                        scale = max_v / norm_xy
+                        v_x_body *= scale
+                        v_y_body *= scale
 
-        msg = Twist()
-        msg.linear.x = v_x_body
-        msg.linear.y = v_y_body
-        msg.linear.z = v_z_body
-        msg.angular.z = yaw_cmd
+                    msg = Twist()
+                    msg.linear.x = v_x_body
+                    msg.linear.y = v_y_body
+                    msg.linear.z = v_z_body
+                    msg.angular.z = yaw_cmd
 
-        self.pub_cmd.publish(msg)
+                    self.pub_cmd.publish(msg)
+                    #todo curr_pos est None
+            feedback_msg.time_remaining = 0.0 #todo
+
+            goal_handle.publish_feedback(feedback_msg)
+            #todo Rate
+            time.sleep(period)
+
+        goal_handle.succeed()
+        result.success = True
+        result.message = "finish"
+        return result
+
 
 
 def main():
     rclpy.init()
     node = TrajectoriesFollower()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
 
-if __name__ == "__main__":
-    main()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+
+    try:
+        executor.spin()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
