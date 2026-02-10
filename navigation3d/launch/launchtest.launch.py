@@ -131,7 +131,7 @@ def generate_launch_description():
         parameters=[params],
     )
     traj_follower = Node(
-        package="trajectories_follower",
+        package="navigation3d",
         executable="trajectories_follower",
         name="trajectories_follower",
         output="screen",

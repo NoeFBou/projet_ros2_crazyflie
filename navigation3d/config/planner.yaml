@@ -18,8 +18,8 @@ trajectories_follower:
     robot_frame : "crazyflie/base_footprint"
     kp_xy: 1.5
     kp_z : 1.5
-    kp_yaw : 1
-    max_speed : 1
+    kp_yaw : 1.0
+    max_speed : 1.0
     period : 0.02
 
 
