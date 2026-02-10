@@ -35,7 +35,7 @@ def generate_launch_description():
     else:
         print(f"Fichier SDF trouve")
 
-    params = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
+    params_file = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
     rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config.rviz')
     world_path = os.path.join(pkg_navigation3d, 'worlds', 'oui.sdf')
     resource_paths = [
@@ -66,7 +66,10 @@ def generate_launch_description():
     # )
     with open(robot_sdf_path, 'r') as infp:
         robot_desc = infp.read()
-
+    common_params = [
+        params_file,
+        {'use_sim_time': True}
+    ]
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -121,21 +124,29 @@ def generate_launch_description():
         executable="planner",
         name="planner",
         output="screen",
-        parameters=[params],
+        parameters=common_params,
     )
     marker_pose = Node(
         package="navigation3d",
         executable="interactive_marker_pose_stamped",
         name="interactive_marker_pose_stamped",
         output="screen",
-        parameters=[params],
+        parameters=common_params,
     )
+
     traj_follower = Node(
         package="navigation3d",
         executable="trajectories_follower",
         name="trajectories_follower",
         output="screen",
-        parameters=[params],
+        parameters=common_params,
+    )
+    supervisor = Node(
+        package="navigation3d",
+        executable="supervisor",
+        name="supervisor",
+        output="screen",
+        parameters=common_params,
     )
     # goal = Node(
     #     package="navigation3d",
@@ -190,16 +201,16 @@ def generate_launch_description():
     ld = LaunchDescription()
     for var in set_env_vars:
         ld.add_action(var)
-    ld.add_action(planner)
     ld.add_action(octomap_server)
     #ld.add_action(robot_state_publisher)  #se truck marche pas :(
-    ld.add_action(marker_pose)
-    ld.add_action(traj_follower)
     ld.add_action(rviz2)
     ld.add_action(gazebo_sim)
     ld.add_action(bridge)
     ld.add_action(control)
     ld.add_action(simple_mapper)
     ld.add_action(spawn_robot)
-    #ld.add_action(trajectories_follower)
+    ld.add_action(planner)
+    ld.add_action(marker_pose)
+    ld.add_action(traj_follower)
+    ld.add_action(supervisor)
     return ld
