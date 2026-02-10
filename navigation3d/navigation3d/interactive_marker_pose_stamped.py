@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-
+import math
 from geometry_msgs.msg import PoseStamped
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from visualization_msgs.msg import (
@@ -16,10 +16,10 @@ from visualization_msgs.msg import (
 class InteractiveGoal(Node):
 
     def __init__(self):
-        super().__init__('interactive_goal_pose')
+        super().__init__('interactive_target_pose')
 
         # Publisher PoseStamped
-        self.pose_pub = self.create_publisher(PoseStamped,'/goal_pose',10)
+        self.pose_pub = self.create_publisher(PoseStamped,'/target_pose',10)
 
         # Interactive Marker server 
         self.server = InteractiveMarkerServer(self,'goal_3d_marker')
@@ -74,6 +74,7 @@ class InteractiveGoal(Node):
         visual = InteractiveMarkerControl()
         visual.always_visible = True
         visual.markers.append(sphere)
+        visual.interaction_mode = InteractiveMarkerControl.MOVE_3D
         int_marker.controls.append(visual)
 
         # Add axis controls
@@ -87,22 +88,35 @@ class InteractiveGoal(Node):
 
     def add_axis_control(self, marker, name, x, y, z):
         control = InteractiveMarkerControl()
-        control.name = name
+        q = [1.0, 0.0, 0.0, 0.0]
 
-        control.orientation.w = 1.0
-        control.orientation.x = float(x)
-        control.orientation.y = float(y)
-        control.orientation.z = float(z)
+        if x == 1:
+            control.name = "move_x"
+            q = [1.0, 0.0, 0.0, 0.0]
+        elif y == 1:
+            control.name = "move_y"
+            val = math.sqrt(2)/2
+            q = [val, 0.0, 0.0, val]
+        elif z == 1:
+            control.name = "move_z"
+            val = math.sqrt(2)/2
+            q = [val, 0.0, -val, 0.0]
+
+        control.orientation.w = q[0]
+        control.orientation.x = q[1]
+        control.orientation.y = q[2]
+        control.orientation.z = q[3]
 
         control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         marker.controls.append(control)
 
-
-
-
-if __name__ == '__main__':
+def main():
     rclpy.init()
     node = InteractiveGoal()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

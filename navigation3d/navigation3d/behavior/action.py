@@ -6,7 +6,9 @@ from rclpy.action import ActionClient
 import py_trees
 from py_trees.common import Status
 import time
-from navigation3d.action import FollowTrajectory
+from navigation3d_interfaces.action import FollowTrajectory
+from tf2_ros import Buffer, TransformListener
+
 
 class WaitGoal(py_trees.behaviour.Behaviour):
     def __init__(self, name ="WaitGoal", topic_name="/target_pose"):
@@ -32,7 +34,10 @@ class WaitGoal(py_trees.behaviour.Behaviour):
         return True
 
     def _callback(self, msg):
-        self.node.get_logger().info(f"new target: {msg.point}")
+
+        p = msg.pose.position
+        self.node.get_logger().info(f"New target : x={p.x:.2f}, y={p.y:.2f}, z={p.z:.2f}")
+
         self.goal_data = msg
         self.new_goal_received = True
 
@@ -42,7 +47,11 @@ class WaitGoal(py_trees.behaviour.Behaviour):
     def update(self):
         if self.new_goal_received and self.goal_data:
 
-            target = [self.goal_data.point.x, self.goal_data.point.y, self.goal_data.point.z]
+            target = [
+                self.goal_data.pose.position.x,
+                self.goal_data.pose.position.y,
+                self.goal_data.pose.position.z
+            ]
             self.blackboard.target_pose = target
 
             self.new_goal_received = False
@@ -68,6 +77,7 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
         self.traj_sub = None
         self.received_traj = None
         self.published = False
+        self.start_time = None
 
     def setup(self, **kwargs):
         self.node = kwargs.get('node')
@@ -88,6 +98,7 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
     def initialise(self):
         self.received_traj = None
         self.published = False
+        self.start_time = time.time()
 
     def update(self):
         if self.blackboard.target_pose is None:
@@ -108,12 +119,16 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
             self.node.get_logger().info(f"New Goal")
 
             self.published = True
+            self.start_time = time.time()
             return Status.RUNNING
 
         if self.received_traj:
             self.blackboard.trajectory = self.received_traj
             return Status.SUCCESS
 
+        if (time.time() - self.start_time) > 20.0:
+            self.node.get_logger().error("PLANNER TIMEOUT")
+            return Status.FAILURE
         return Status.RUNNING
 
 class ChangeHeight(py_trees.behaviour.Behaviour):
@@ -146,10 +161,12 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
                 rclpy.time.Time()
             )
             current_z = t.transform.translation.z
-        except LookupException:
+        except (LookupException, ConnectivityException, ExtrapolationException) as e:
+            self.node.get_logger().warn(f"TF Error (TakeOff): {e}", throttle_duration_sec=1.0)
             return Status.RUNNING
 
         error = self.target_height - current_z
+        self.node.get_logger().info(f"H_actuelle: {current_z:.2f}m | Cible: {self.target_height:.2f}m", throttle_duration_sec=1.0)
 
         if abs(error) < self.threshold:
             self.publisher.publish(Twist())
@@ -157,13 +174,14 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
 
             return Status.SUCCESS
 
-
+        if self.target_height > 0.3 and current_z > self.target_height:
+            self.node.get_logger().info(f"Déjà a {current_z:.2f}m")
+            return Status.SUCCESS
         kp = 1.0
         vel_z = kp * error
+        vel_z = max(min(vel_z, 0.5), -0.5) # Clamp
 
-        vel_z = max(min(vel_z, 0.5), -0.5)
-
-        if vel_z > 0 and vel_z < 0.1: vel_z = 0.1
+        if vel_z > 0 and vel_z < 0.1: vel_z = 0.2
         elif vel_z < 0 and vel_z > -0.1: vel_z = -0.1
 
         msg = Twist()

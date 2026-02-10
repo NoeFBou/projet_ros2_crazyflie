@@ -124,13 +124,13 @@ def generate_launch_description():
         parameters=[params],
     )
 
-    goal = Node(
-        package="navigation3d",
-        executable="goal_manager",
-        name="goal_manager",
-        output="screen",
-        parameters=[params],
-    )
+    # goal = Node(
+    #     package="navigation3d",
+    #     executable="goal_manager",
+    #     name="goal_manager",
+    #     output="screen",
+    #     parameters=[params],
+    # )
 
     rviz2 = Node(
         package='rviz2',
@@ -180,7 +180,7 @@ def generate_launch_description():
     ld.add_action(planner)
     ld.add_action(octomap_server)
     #ld.add_action(robot_state_publisher)  #se truck marche pas :(
-    ld.add_action(goal)
+    # ld.add_action(goal)
     ld.add_action(rviz2)
     ld.add_action(gazebo_sim)
     ld.add_action(bridge)

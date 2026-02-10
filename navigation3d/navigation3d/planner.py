@@ -108,7 +108,7 @@ class Planner(Node):
         self.bbox_margin = self.get_parameter("bbox_margin").value
 
         # Replan when params change
-        self.add_on_set_parameters_callback(self._on_params)
+        # self.add_on_set_parameters_callback(self._on_params)
         self.get_logger().info("Planner started. Waiting for occupied cloud...")
 
     def _occupied_cloud_callback(self, msg: PointCloud2):
@@ -126,25 +126,25 @@ class Planner(Node):
 
     #plan or replan when goal/grid are set or change
     #tmp
-    def _on_params(self, params: List[Parameter]):
-        updated = False
-
-        for p in params:
-            if p.name == "start":
-                self.current_start = p.value
-                updated = True
-            elif p.name == "goal":
-                self.current_goal = p.value
-                updated = True
-            elif p.name == "grid_res" or p.name == "inflation" or p.name=="bbox_margin":
-
-                pass
-
-        if updated and self.map_ready:
-            #self.get_logger().info(f"Params update detected. New Goal: {self.current_goal}")
-            self.planner()
-
-        return SetParametersResult(successful=True)
+    # def _on_params(self, params: List[Parameter]):
+    #     updated = False
+    #
+    #     for p in params:
+    #         if p.name == "start":
+    #             self.current_start = p.value
+    #             updated = True
+    #         elif p.name == "goal":
+    #             self.current_goal = p.value
+    #             updated = True
+    #         elif p.name == "grid_res" or p.name == "inflation" or p.name=="bbox_margin":
+    #
+    #             pass
+    #
+    #     if updated and self.map_ready:
+    #         #self.get_logger().info(f"Params update detected. New Goal: {self.current_goal}")
+    #         self.planner()
+    #
+    #     return SetParametersResult(successful=True)
 
     # def _prune_path(self, path: List[GridIdx]) -> List[GridIdx]:
     #     if len(path) < 3: return path
@@ -241,7 +241,12 @@ class Planner(Node):
         if real_pose:
             start = real_pose
             self.get_logger().info(f"Start set to Drone Position: {start}")
+            if start[2] < 0.3:
+                self.get_logger().warn(f"Drone au sol ({start[2]:.2f}m).")
+                start[2] = 0.5
         else:
+            self.get_logger().warn(f"Drone TF not found")
+            return
             start = self.current_start
             self.get_logger().warn(f"Drone TF not found. Using param Start: {start}")
 

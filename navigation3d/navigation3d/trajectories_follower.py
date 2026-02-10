@@ -8,7 +8,7 @@ from trajectory_msgs.msg import MultiDOFJointTrajectory
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 import tf_transformations
-from navigation3d.action import FollowTrajectory
+from navigation3d_interfaces.action import FollowTrajectory
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 

@@ -12,7 +12,7 @@ class Supervisor(Node):
 
     def setup_tree(self) :
 
-        root = py_trees.composites.Selector(name="Supervisor")
+        root = py_trees.composites.Selector(name="Supervisor", memory=False)
         #branch batterie
         #battery_branch = py_trees.composites.Sequence(name="battery branch", memory=True)
 
