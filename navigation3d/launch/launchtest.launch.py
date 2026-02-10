@@ -123,7 +123,20 @@ def generate_launch_description():
         output="screen",
         parameters=[params],
     )
-
+    marker_pose = Node(
+        package="navigation3d",
+        executable="interactive_marker_pose_stamped",
+        name="interactive_marker_pose_stamped",
+        output="screen",
+        parameters=[params],
+    )
+    traj_follower = Node(
+        package="trajectories_follower",
+        executable="trajectories_follower",
+        name="trajectories_follower",
+        output="screen",
+        parameters=[params],
+    )
     # goal = Node(
     #     package="navigation3d",
     #     executable="goal_manager",
@@ -180,7 +193,8 @@ def generate_launch_description():
     ld.add_action(planner)
     ld.add_action(octomap_server)
     #ld.add_action(robot_state_publisher)  #se truck marche pas :(
-    # ld.add_action(goal)
+    ld.add_action(marker_pose)
+    ld.add_action(traj_follower)
     ld.add_action(rviz2)
     ld.add_action(gazebo_sim)
     ld.add_action(bridge)

@@ -243,7 +243,7 @@ class Planner(Node):
             self.get_logger().info(f"Start set to Drone Position: {start}")
             if start[2] < 0.3:
                 self.get_logger().warn(f"Drone au sol ({start[2]:.2f}m).")
-                start[2] = 0.5
+                start[2] = 1# 0.5
         else:
             self.get_logger().warn(f"Drone TF not found")
             return
@@ -261,6 +261,7 @@ class Planner(Node):
         if not path_astar:
             self.get_logger().warn("A* failed: No path found.")
             return
+        astar_lenght = self._aster_lenght(path_astar)
 
 
         self.get_logger().info(f"A* found: {len(path_astar)} voxels")
@@ -291,9 +292,34 @@ class Planner(Node):
 
         self.get_logger().info(f"Trajectory generated: {len(path_verified.position)} samples")
         self._publish_trajectory(path_verified,  self.marker_pub_verif, ns="verif", color=(0.0, 1.0, 1.0))
+        min_snap_length = self._min_snap_lenght(path_verified)
+        if astar_lenght < 0.1:
+            ratio = 1.0
+        else:
+            ratio = min_snap_length / astar_lenght
 
+        self.get_logger().info(f"Check Traj: Len A*={astar_lenght:.2f}m, Len Snap={min_snap_length:.2f}m, Ratio={ratio:.2f}")
+
+        if ratio > 2.0:
+            self.get_logger().error(f"Trajectoire rejetée. Ratio: {ratio:.2f}")
+            return
         self.publish_final_trajectory(path_verified,t_samples, acceleration)
 
+    def _aster_lenght(self, path):
+        astar_length = 0.0
+        for i in range(len(path) - 1):
+            p1 = np.array(path[i])
+            p2 = np.array(path[i+1])
+            astar_length += np.linalg.norm(p2 - p1)
+        return astar_length
+    def _min_snap_lenght(self, quad_traj):
+        positions = quad_traj.position
+
+        diffs = np.diff(positions, axis=0)
+        dists = np.linalg.norm(diffs, axis=1)
+        minsnap_length = np.sum(dists)
+
+        return minsnap_length
 
     def _check_and_repair(self, quad_traj, current_waypoints: List[Waypoint], raw_astar_path: List[GridIdx]) -> Tuple[bool, List[Waypoint]]:
 
@@ -370,16 +396,18 @@ class Planner(Node):
                         dir2 = v2 / norm_v2
                         dot_prod = np.dot(dir1, dir2)
                         dot_prod = max(-1.0, min(1.0, dot_prod))
-
                         angle = math.acos(dot_prod)
 
-                        segment_time += (angle * 2)  # Facteur 1.5 à ajuster
+                        corner_penalty = (angle / math.pi) * 1.0
+                        segment_time += corner_penalty
 
-                segment_time = max(segment_time, 0.5)
+                segment_time = max(segment_time, 0.1)
 
                 current_time += segment_time
 
-            if i == 0 or i == len(raw_points) - 1:
+            if i == 0:
+                wp = Waypoint(time=current_time, position=pos, velocity=[0,0,0], acceleration=[0,0,0])
+            elif i == len(raw_points) - 1:
                 wp = Waypoint(time=current_time, position=pos, velocity=[0,0,0], acceleration=[0,0,0])
             else:
                 wp = Waypoint(time=current_time, position=pos)
@@ -387,6 +415,7 @@ class Planner(Node):
             waypoints.append(wp)
 
         return waypoints
+
     def waypoint_to_trajectory(self, waypoints):
 
         traj_poly = generate_trajectory(waypoints, degree=7, idx_minimized_orders=4)

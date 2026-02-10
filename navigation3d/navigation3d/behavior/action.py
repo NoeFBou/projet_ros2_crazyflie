@@ -126,7 +126,7 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
             self.blackboard.trajectory = self.received_traj
             return Status.SUCCESS
 
-        if (time.time() - self.start_time) > 20.0:
+        if (time.time() - self.start_time) > 10.0:
             self.node.get_logger().error("PLANNER TIMEOUT")
             return Status.FAILURE
         return Status.RUNNING
@@ -166,7 +166,7 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
             return Status.RUNNING
 
         error = self.target_height - current_z
-        self.node.get_logger().info(f"H_actuelle: {current_z:.2f}m | Cible: {self.target_height:.2f}m", throttle_duration_sec=1.0)
+        #self.node.get_logger().info(f"H_actuelle: {current_z:.2f}m | Cible: {self.target_height:.2f}m", throttle_duration_sec=1.0)
 
         if abs(error) < self.threshold:
             self.publisher.publish(Twist())
