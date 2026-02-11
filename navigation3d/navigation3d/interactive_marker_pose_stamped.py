@@ -56,9 +56,9 @@ class InteractiveGoal(Node):
         int_marker.scale = 0.4
 
         # Initial position
-        int_marker.pose.position.x = 1.0
-        int_marker.pose.position.y = 0.0
-        int_marker.pose.position.z = 0.5
+        int_marker.pose.position.x = 17.63 #1.0
+        int_marker.pose.position.y = -0.84# 0.0
+        int_marker.pose.position.z = 5.39# 0.5
 
         # Rviz visual
         sphere = Marker()

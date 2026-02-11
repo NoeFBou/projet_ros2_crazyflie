@@ -37,7 +37,7 @@ def generate_launch_description():
 
     params_file = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
     rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config.rviz')
-    world_path = os.path.join(pkg_navigation3d, 'worlds', 'oui.sdf')
+    world_path = os.path.join(pkg_navigation3d, 'worlds', 'test2.sdf')
     resource_paths = [
         os.path.join(pkg_navigation3d, 'worlds'), ':',
         os.path.join(pkg_crazyflie_bringup, 'models'), ':',
@@ -177,7 +177,7 @@ def generate_launch_description():
         ],
         output='screen'
     )
-    map_path = os.path.join(pkg_navigation3d, 'maps', 'fr_campus.bt')
+    map_path = os.path.join(pkg_navigation3d, 'maps', 'map.bt')
     octomap_server = Node(
         package='octomap_server',
         executable='octomap_server_node',
