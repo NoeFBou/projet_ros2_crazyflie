@@ -17,18 +17,8 @@ def generate_launch_description():
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_crazyflie_bringup = get_package_share_directory('ros_gz_crazyflie_bringup')
 
-    # path_to_models_source = os.path.join(
-    #     os.environ.get('HOME'),
-    #     'crazyflie_ws/src/ros_gz_crazyflie/ros_gz_crazyflie_gazebo/models/crazyflie'
-    # )
-    # robot_sdf_path = os.path.join(path_to_models_source, 'crazyflie', 'model.sdf')
-
-    models_parent_dir = os.path.join(
-        os.environ.get('HOME'),
-        'crazyflie_ws/src/ros_gz_crazyflie/ros_gz_crazyflie_gazebo/models'
-    )
-
-    robot_sdf_path = os.path.join(models_parent_dir, 'crazyflie', 'model.sdf')
+    model_folder = os.path.join(pkg_navigation3d, 'meshes', 'crazyflie')
+    robot_sdf_path = os.path.join(model_folder, 'model.sdf')
 
     if not os.path.exists(robot_sdf_path):
         print(f"fichier SDF introuvable : {robot_sdf_path}")
@@ -38,11 +28,14 @@ def generate_launch_description():
     params_file = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
     rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config5.rviz')
     world_path = os.path.join(pkg_navigation3d, 'worlds', 'test2.sdf')
+    nav3d_meshes_dir = os.path.join(pkg_navigation3d, 'meshes')
+
     resource_paths = [
         os.path.join(pkg_navigation3d, 'worlds'), ':',
         os.path.join(pkg_crazyflie_bringup, 'models'), ':',
-        models_parent_dir
+        nav3d_meshes_dir
     ]
+
     set_env_vars = [
             #SetEnvironmentVariable(name='MESA_GL_VERSION_OVERRIDE', value='3.3'),
             #SetEnvironmentVariable(name='MESA_GLES_VERSION_OVERRIDE', value='3.3'),
@@ -56,14 +49,6 @@ def generate_launch_description():
             SetEnvironmentVariable(name='GZ_SIM_RESOURCE_PATH', value=resource_paths),
         ]
 
-    # gz_resource_path = SetEnvironmentVariable(
-    #     name='GZ_SIM_RESOURCE_PATH',
-    #     value=[
-    #         os.path.join(pkg_pointcloud_builder, 'worlds'), ':',
-    #         os.path.join(pkg_crazyflie_description, 'models'), ':',
-    #         '/home/test/crazyflie_ws/src/crazyflie-simulation/simulator_files/gazebo'
-    #     ]
-    # )
     with open(robot_sdf_path, 'r') as infp:
         robot_desc = infp.read()
     common_params = [
@@ -189,14 +174,6 @@ def generate_launch_description():
             'height_map': True
         }]
     )
-
-    # trajectories_follower = Node(
-    #     package='navigation3d',
-    #     executable='trajectories_follower',
-    #     name='trajectories_follower',
-    #     output='screen',
-    #     parameters=[params],
-    # )
 
     ld = LaunchDescription()
     for var in set_env_vars:
