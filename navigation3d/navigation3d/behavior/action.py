@@ -150,7 +150,7 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
         return True
 
     def initialise(self):
-        self.node.get_logger().info(f"Décollage")
+        self.node.get_logger().info(f"decollage/atterissage")
 
     def update(self):
         try:
