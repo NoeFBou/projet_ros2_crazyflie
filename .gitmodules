@@ -1,0 +1,12 @@
+[submodule "external/crazyflie-simulation"]
+	path = external/crazyflie-simulation
+	url = git@github.com:bitcraze/crazyflie-simulation.git
+[submodule "external/crazyswarm2"]
+	path = external/crazyswarm2
+	url = git@github.com:IMRCLab/crazyswarm2.git
+[submodule "external/ros_gz_crazyflie"]
+	path = external/ros_gz_crazyflie
+	url = git@github.com:knmcguire/ros_gz_crazyflie.git
+[submodule "external/crazyflie_ros2_multiranger"]
+	path = external/crazyflie_ros2_multiranger
+	url = git@github.com:knmcguire/crazyflie_ros2_multiranger.git
