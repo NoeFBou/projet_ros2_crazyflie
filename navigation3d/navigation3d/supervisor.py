@@ -8,7 +8,17 @@ from navigation3d.behavior.action import WaitGoal, TrajectoriesPlanner, FollowTr
 class Supervisor(Node):
     def __init__(self):
         super().__init__('supervisor')
-        self.declare_parameter("topic_name","/target_pose")
+        self.declare_parameter("height_take_off",0.5)
+        self.declare_parameter("height_landing",0.05)
+        self.declare_parameter("target_topic", "/target_pose")
+        self.declare_parameter("goal_topic", "/goal_pose")
+        self.declare_parameter("traj_topic", "/planned_trajectory_final")
+        self.declare_parameter("timeout", 10.0)
+        self.declare_parameter("cmd_vel_topic", "/cmd_vel")
+        self.declare_parameter("robot_frame", "crazyflie/base_footprint")
+        self.declare_parameter("speed_take_off", 0.2)
+        self.declare_parameter("speed_landing", -0.1)
+        self.declare_parameter("frame_id", "map")
 
     def setup_tree(self) :
 
@@ -23,9 +33,9 @@ class Supervisor(Node):
         wait_goal = WaitGoal()
         trajectory = TrajectoriesPlanner()
         #check_battey_trajectory = CheckBatteryTrajectory()
-        takeoff = ChangeHeight(height = 0.5)
+        takeoff = ChangeHeight(height = self.get_parameter("height_take_off").value)
         follow_trajectory = FollowTrajectoryBehavior(name="Follow Trajectory")
-        land = ChangeHeight(height = 0.05)
+        land = ChangeHeight(height = self.get_parameter("height_landing").value)
 
 
         navigation_branch.add_children([wait_goal,trajectory, #check_battey_trajectory

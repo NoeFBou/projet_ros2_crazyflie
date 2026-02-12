@@ -36,21 +36,13 @@ class Planner(Node):
         self.declare_parameter("drone_mass", 0.032 )
         self.declare_parameter("sample_rate", 0.05)
         self.declare_parameter("avg_speed", 0.5)
-
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.declare_parameter("world_frame", "map")
         self.declare_parameter("robot_frame", "crazyflie/base_footprint")
         self.declare_parameter("goal_topic", "/goal_pose")
         self.declare_parameter("force_goal_z", -1.0)
-        # self.frame_id = self.get_parameter("frame_id").value
-        # self.step = 5
-        # qos_sub = QoSProfile(
-        #     reliability=QoSReliabilityPolicy.BEST_EFFORT,
-        #     history=QoSHistoryPolicy.KEEP_LAST,
-        #     depth=1,
-        # )
+        self.declare_parameter("height_take_off", 0.5)
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.map_reader = OctomapReader(
             grid_res=self.get_parameter("grid_res").value,
             inflation_astar=self.get_parameter("inflation_astar").value,
@@ -84,14 +76,10 @@ class Planner(Node):
         )
 
         self.marker_pub_basic = self.create_publisher(Marker, "planned_path_marker", latching_qos)
-
         self.marker_pub_pruned = self.create_publisher(Marker, "planned_path_marker_pruned", latching_qos)
-
         self.marker_pub_snaped = self.create_publisher(Marker, "planned_path_marker_snaped", latching_qos)
         self.marker_pub_densify= self.create_publisher(Marker, "planned_path_marker_densify", latching_qos)
-        # self.path_verified_basic = self.create_publisher(Path, "planned_path_Snaped_verif", latching_qos)
         self.marker_pub_verif = self.create_publisher(Marker, "planned_path_marker_snaped_verif", latching_qos)
-
         self.traj_pub = self.create_publisher(MultiDOFJointTrajectory, "planned_trajectory_final", latching_qos)
 
         self.occupied: Set[GridIdx] = set()
@@ -109,7 +97,7 @@ class Planner(Node):
 
     def get_drone_position(self) -> Optional[List[float]]:
 
-        world_frame = self.get_parameter("world_frame").value
+        world_frame = self.get_parameter("frame_id").value
         robot_frame = self.get_parameter("robot_frame").value
 
         try:
@@ -148,40 +136,6 @@ class Planner(Node):
             self.planner()
         else:
             self.get_logger().warn("map not ready yet")
-
-
-    # def _prune_path(self, path: List[GridIdx]) -> List[GridIdx]:
-    #     if len(path) < 3: return path
-    #
-    #     pruned = [path[0]]
-    #     old_dir = (path[1][0]-path[0][0], path[1][1]-path[0][1], path[1][2]-path[0][2])
-    #     last_kept_idx = 0
-    #     max_segment_dist = 1.5
-    #     grid_res = self.get_parameter("grid_res").value
-    #
-    #     for i in range(1, len(path) - 1):
-    #         cur, nxt = path[i], path[i+1]
-    #         new_dir = (nxt[0]-cur[0], nxt[1]-cur[1], nxt[2]-cur[2])
-    #
-    #         last_kept = path[last_kept_idx]
-    #         dist_sq = (cur[0]-last_kept[0])**2 + (cur[1]-last_kept[1])**2 + (cur[2]-last_kept[2])**2
-    #         dist_meters = math.sqrt(dist_sq) * grid_res
-    #
-    #         keep_point = False
-    #
-    #         if new_dir != old_dir:
-    #             keep_point = True
-    #
-    #         elif dist_meters > max_segment_dist:
-    #             keep_point = True
-    #
-    #         if keep_point:
-    #             pruned.append(cur)
-    #             old_dir = new_dir
-    #             last_kept_idx = i
-    #
-    #     pruned.append(path[-1])
-    #     return pruned
 
     def _densify_path(self, path_idx: List[GridIdx], max_dist: float = 1.0) -> List[GridIdx]:
         if len(path_idx) < 2:
@@ -294,7 +248,7 @@ class Planner(Node):
             self.get_logger().info(f"Start set to Drone Position: {start}")
             if start[2] < 0.3:
                 self.get_logger().warn(f"Drone au sol ({start[2]:.2f}m).")
-                start[2] = 1# 0.5
+                start[2] = self.get_parameter("height_take_off").value
         else:
             self.get_logger().warn(f"Drone TF not found")
             return
@@ -431,8 +385,6 @@ class Planner(Node):
             return False, current_waypoints
 
         safe_pos = np.array(self.map_reader.grid_to_world(safest_grid_idx))
-
-        # 4. STRATEGIE D'INSERTION INTELLIGENTE (La clé est ici)
 
         new_waypoints = []
         inserted = False

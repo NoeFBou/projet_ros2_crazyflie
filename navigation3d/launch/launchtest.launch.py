@@ -36,7 +36,7 @@ def generate_launch_description():
         print(f"Fichier SDF trouve")
 
     params_file = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
-    rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config.rviz')
+    rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config5.rviz')
     world_path = os.path.join(pkg_navigation3d, 'worlds', 'test2.sdf')
     resource_paths = [
         os.path.join(pkg_navigation3d, 'worlds'), ':',

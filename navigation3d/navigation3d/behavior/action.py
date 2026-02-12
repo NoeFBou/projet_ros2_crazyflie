@@ -11,10 +11,9 @@ from tf2_ros import Buffer, TransformListener
 
 
 class WaitGoal(py_trees.behaviour.Behaviour):
-    def __init__(self, name ="WaitGoal", topic_name="/target_pose"):
+    def __init__(self, name ="WaitGoal"):
         super(WaitGoal, self).__init__(name)
         self.name = name
-        self.topic_name = topic_name
         self.node = None
         self.subscriber = None
         self.new_goal_received = False
@@ -27,7 +26,7 @@ class WaitGoal(py_trees.behaviour.Behaviour):
         self.node: Node = kwargs.get('node')
         self.subscriber = self.node.create_subscription(
             PoseStamped,
-            self.topic_name,
+            self.node.get_parameter("target_topic").value,
             self._callback,
             10
         )
@@ -82,11 +81,11 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
     def setup(self, **kwargs):
         self.node = kwargs.get('node')
 
-        self.goal_pub = self.node.create_publisher(PoseStamped, '/goal_pose', 10)
+        self.goal_pub = self.node.create_publisher(PoseStamped, self.node.get_parameter("goal_topic").value, 10)
 
         self.traj_sub = self.node.create_subscription(
             MultiDOFJointTrajectory,
-            '/planned_trajectory_final',
+            self.node.get_parameter("traj_topic").value,
             self._traj_callback,
             10
         )
@@ -108,7 +107,7 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
             target = self.blackboard.target_pose
 
             msg = PoseStamped()
-            msg.header.frame_id = "map"
+            msg.header.frame_id = self.node.get_parameter("frame_id").value
             msg.header.stamp = self.node.get_clock().now().to_msg()
             msg.pose.position.x = target[0]
             msg.pose.position.y = target[1]
@@ -126,13 +125,13 @@ class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
             self.blackboard.trajectory = self.received_traj
             return Status.SUCCESS
 
-        if (time.time() - self.start_time) > 10.0:
+        if (time.time() - self.start_time) > self.node.get_parameter("timeout").value:
             self.node.get_logger().error("PLANNER TIMEOUT")
             return Status.FAILURE
         return Status.RUNNING
 
 class ChangeHeight(py_trees.behaviour.Behaviour):
-    def __init__(self, name="Take Off", height=1.0, threshold=0.1): #10cm
+    def __init__(self, name="Change Height", height=1.0, threshold=0.1): #10cm
         super(ChangeHeight, self).__init__(name)
         self.target_height = height #m
         self.threshold = threshold
@@ -144,7 +143,7 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
 
     def setup(self, **kwargs):
         self.node = kwargs.get('node')
-        self.publisher = self.node.create_publisher(Twist, "/cmd_vel", 10)
+        self.publisher = self.node.create_publisher(Twist, self.node.get_parameter("cmd_vel_topic").value, 10)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self.node)
@@ -156,8 +155,8 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
     def update(self):
         try:
             t = self.tf_buffer.lookup_transform(
-                "map",
-                "crazyflie/base_footprint",
+                self.node.get_parameter("frame_id").value,
+                self.node.get_parameter("robot_frame").value,
                 rclpy.time.Time()
             )
             current_z = t.transform.translation.z
@@ -181,8 +180,8 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
         vel_z = kp * error
         vel_z = max(min(vel_z, 0.5), -0.5) # Clamp
 
-        if vel_z > 0 and vel_z < 0.1: vel_z = 0.2
-        elif vel_z < 0 and vel_z > -0.1: vel_z = -0.1
+        if vel_z > 0 and vel_z < 0.1: vel_z = self.node.get_parameter("speed_take_off").value
+        elif vel_z < 0 and vel_z > -0.1: vel_z = self.node.get_parameter("speed_landing").value
 
         msg = Twist()
         msg.linear.z = float(vel_z)

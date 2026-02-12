@@ -1,47 +1,54 @@
+supervisor:
+  ros__parameters:
+    frame_id: "map"
+    robot_frame: "crazyflie/base_footprint"
+    cmd_vel_topic: "/cmd_vel"
+    traj_topic: "/planned_trajectory_final"
+    goal_topic: "/goal_pose"
+    target_topic: "/target_pose"
+
+    height_take_off: 1.0
+    height_landing: 0.05
+    timeout: 10.0
+    speed_take_off: 0.2
+    speed_landing: -0.1
+
+interactive_marker_pose_stamped:
+  ros__parameters:
+    frame_id: "map"
+    target_topic: "/target_pose"
+
+    default_x_pose: 17.63
+    default_y_pose: -0.84
+    default_z_pose: 5.39
+
 planner:
   ros__parameters:
-    frame_id : "map"
-    occupied_cloud_topic : "/octomap_point_cloud_centers"
-    grid_res : 0.20
-    inflation : 0.30
-    bbox_margin : 1.0
-    start : [10.0, 0.0, 2.5]
-    goal :  [36.63155746459961, -60.41566467285156, 3.5]
-    drone_mass : 0.032
-    sample_rate : 0.05
-    avg_speed : 0.5
+    frame_id: "map"
+    robot_frame: "crazyflie/base_footprint"
+    goal_topic: "/goal_pose"
+    traj_topic: "/planned_trajectory_final"
+
+    occupied_cloud_topic: "/octomap_point_cloud_centers"
+    grid_res: 0.20
+    inflation_astar: 0.30
+    inflation_minsnap: 0.10
+    bbox_margin: 1.0
+    drone_mass: 0.032
+    sample_rate: 0.05
+    avg_speed: 0.5
+    force_goal_z: -1.0
+    height_take_off: 1.0
 
 trajectories_follower:
   ros__parameters:
-    traj_topic : "/planned_trajectory_final"
-    cmd_vel_topic : "/cmd_vel"
-    robot_frame : "crazyflie/base_footprint"
+    frame_id: "map"
+    robot_frame: "crazyflie/base_footprint"
+    cmd_vel_topic: "/cmd_vel"
+    traj_topic: "/planned_trajectory_final"
+
     kp_xy: 1.5
-    kp_z : 1.5
-    kp_yaw : 1.0
-    max_speed : 1.0
-    period : 0.02
-
-
-
-
-
-#sfc_generator:
-#  ros__parameters:
-#    frame_id: "map"
-#    occupied_cloud_topic: "/octomap_point_cloud_centers"
-#    grid_res: 0.20
-#    inflation: 0.30
-#    min_half: [0.4, 0.4, 0.25]
-#    max_half: [1.5, 1.5, 0.8]
-#    grow_step: 0.10
-#    path_stride: 3
-goal_manager:
-  ros__parameters:
-    mode: "goal_only"
-    planner_node: "/planner"
-    clicked_topic: "/clicked_point"
-    default_start: [10.0, 0.0, 2.5]
-    use_fixed_z: true
-    fixed_z: 0.5
-
+    kp_z: 1.5
+    kp_yaw: 1.0
+    max_speed: 1.0
+    period: 0.02

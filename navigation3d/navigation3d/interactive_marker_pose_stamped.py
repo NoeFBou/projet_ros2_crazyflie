@@ -17,9 +17,14 @@ class InteractiveGoal(Node):
 
     def __init__(self):
         super().__init__('interactive_target_pose')
+        self.declare_parameter("frame_id", "map")
+        self.declare_parameter("target_topic", "/target_pose")
+        self.declare_parameter("default_x_pose", 17.63)
+        self.declare_parameter("default_y_pose", -0.84)
+        self.declare_parameter("default_z_pose", 5.39)
 
         # Publisher PoseStamped
-        self.pose_pub = self.create_publisher(PoseStamped,'/target_pose',10)
+        self.pose_pub = self.create_publisher(PoseStamped,self.get_parameter("target_topic").value,10)
 
         # Interactive Marker server 
         self.server = InteractiveMarkerServer(self,'goal_3d_marker')
@@ -36,7 +41,7 @@ class InteractiveGoal(Node):
             return
 
         pose = PoseStamped()
-        pose.header.frame_id = 'map'
+        pose.header.frame_id = self.get_parameter("frame_id").value
         pose.header.stamp = self.get_clock().now().to_msg()
         pose.pose = feedback.pose
 
@@ -50,15 +55,15 @@ class InteractiveGoal(Node):
 
     def make_marker(self):
         int_marker = InteractiveMarker()
-        int_marker.header.frame_id = 'map'
+        int_marker.header.frame_id = self.get_parameter("frame_id").value
         int_marker.name = 'goal_3d'
         int_marker.description = 'Goal 3D'
         int_marker.scale = 0.4
 
         # Initial position
-        int_marker.pose.position.x = 17.63 #1.0
-        int_marker.pose.position.y = -0.84# 0.0
-        int_marker.pose.position.z = 5.39# 0.5
+        int_marker.pose.position.x = self.get_parameter("default_x_pose").value
+        int_marker.pose.position.y = self.get_parameter("default_y_pose").value
+        int_marker.pose.position.z = self.get_parameter("default_z_pose").value
 
         # Rviz visual
         sphere = Marker()
