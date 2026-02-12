@@ -171,7 +171,7 @@ def generate_launch_description():
         arguments=[
             '-name', 'crazyflie',
             '-file', robot_sdf_path,
-            '-x', '0.0',
+            '-x', '-2.0',
             '-y', '0.0',
             '-z', '0.05'
         ],

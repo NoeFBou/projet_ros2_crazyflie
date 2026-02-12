@@ -3,7 +3,7 @@ planner:
     frame_id : "map"
     occupied_cloud_topic : "/octomap_point_cloud_centers"
     grid_res : 0.20
-    inflation : 0.20
+    inflation : 0.30
     bbox_margin : 1.0
     start : [10.0, 0.0, 2.5]
     goal :  [36.63155746459961, -60.41566467285156, 3.5]

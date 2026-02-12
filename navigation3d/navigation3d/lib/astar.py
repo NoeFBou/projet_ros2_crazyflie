@@ -35,7 +35,7 @@ class AStar:
         start_idx = self.map.world_to_grid(start_world)
         goal_idx = self.map.world_to_grid(goal_world)
 
-        if self.map.is_occupied(start_idx) or self.map.is_occupied(goal_idx):
+        if self.map.is_occupied_astar(start_idx) or self.map.is_occupied_astar(goal_idx):
             return None
         m = int(math.ceil(self.bbox_margin / self.map.grid_res))
 
@@ -75,7 +75,7 @@ class AStar:
 
             for dx, dy, dz in self.neighbor_steps:
                 nb = (cur[0] + dx, cur[1] + dy, cur[2] + dz)
-                if not self.in_bounds(nb,minx,maxx,miny,maxy,minz,maxz) or self.map.is_occupied(nb) :
+                if not self.in_bounds(nb,minx,maxx,miny,maxy,minz,maxz) or self.map.is_occupied_astar(nb) :
                     continue
 
                 step_cost = math.sqrt(dx*dx + dy*dy + dz*dz)
