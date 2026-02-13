@@ -20,13 +20,22 @@ private:
 
     void computeAndPublishADE();
     double computeADE();
+    void computeAndPublishXTE();
+    double computeXTE();
     geometry_msgs::msg::Point interpolatePlannedPosition(const rclcpp::Time& time);
+    std::pair<size_t, size_t> findClosestSegment(const geometry_msgs::msg::Point& position);
+    double pointToSegmentDistance(
+        const geometry_msgs::msg::Point& point,
+        const geometry_msgs::msg::Point& seg_start,
+        const geometry_msgs::msg::Point& seg_end
+    );
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<trajectory_msgs::msg::MultiDOFJointTrajectory>::SharedPtr
         planned_traj_sub_;
 
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr ade_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr xte_pub_;
 
     // Timer for periodic ADE computation
     rclcpp::TimerBase::SharedPtr timer_;

@@ -24,11 +24,16 @@ DriftEvaluatorNode::DriftEvaluatorNode() : Node("drift_evaluator_node") {
     );
 
     ade_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/drift/ade", 10);
+    xte_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/drift/xte", 10);
 
     auto timer_period = std::chrono::duration<double>(1.0 / update_rate_);
-    timer_            = this->create_wall_timer(
+
+    timer_ = this->create_wall_timer(
         std::chrono::duration_cast<std::chrono::milliseconds>(timer_period),
-        std::bind(&DriftEvaluatorNode::computeAndPublishADE, this)
+        [this]() {
+            this->computeAndPublishADE();
+            this->computeAndPublishXTE();
+        }
     );
 
     RCLCPP_INFO(this->get_logger(), "Drift Evaluator Node initialized");
@@ -192,6 +197,149 @@ void DriftEvaluatorNode::computeAndPublishADE() {
             "Average Displacement Error: %.4f m (based on %zu points)",
             ade,
             actual_positions_.size()
+        );
+    }
+}
+
+/*
+ * Find trajectory segment that is closest to given pos
+ * Returns indices of the two points forming the segment
+ */
+std::pair<size_t, size_t>
+DriftEvaluatorNode::findClosestSegment(const geometry_msgs::msg::Point& position) {
+    if (!planned_trajectory_ || planned_trajectory_->points.size() < 2) {
+        return { 0, 0 };
+    }
+
+    double min_distance = std::numeric_limits<double>::max();
+    size_t closest_idx1 = 0;
+    size_t closest_idx2 = 1;
+
+    for (size_t i = 0; i < planned_trajectory_->points.size() - 1; ++i) {
+        if (planned_trajectory_->points[i].transforms.empty()
+            || planned_trajectory_->points[i + 1].transforms.empty()) {
+            continue;
+        }
+
+        geometry_msgs::msg::Point p1, p2;
+        p1.x = planned_trajectory_->points[i].transforms[0].translation.x;
+        p1.y = planned_trajectory_->points[i].transforms[0].translation.y;
+        p1.z = planned_trajectory_->points[i].transforms[0].translation.z;
+
+        p2.x = planned_trajectory_->points[i + 1].transforms[0].translation.x;
+        p2.y = planned_trajectory_->points[i + 1].transforms[0].translation.y;
+        p2.z = planned_trajectory_->points[i + 1].transforms[0].translation.z;
+
+        double distance = pointToSegmentDistance(position, p1, p2);
+
+        if (distance < min_distance) {
+            min_distance = distance;
+            closest_idx1 = i;
+            closest_idx2 = i + 1;
+        }
+    }
+
+    return { closest_idx1, closest_idx2 };
+}
+
+double DriftEvaluatorNode::pointToSegmentDistance(
+    const geometry_msgs::msg::Point& point,
+    const geometry_msgs::msg::Point& seg_start,
+    const geometry_msgs::msg::Point& seg_end
+) {
+    // Vector from seg_start to seg_end
+    double dx = seg_end.x - seg_start.x;
+    double dy = seg_end.y - seg_start.y;
+    double dz = seg_end.z - seg_start.z;
+
+    // Compute segment length squared
+    double segment_length_sq = dx * dx + dy * dy + dz * dz;
+
+    // If segment has zero length, return distance to the point
+    if (segment_length_sq < 1e-10) {
+        double px = point.x - seg_start.x;
+        double py = point.y - seg_start.y;
+        double pz = point.z - seg_start.z;
+        return std::sqrt(px * px + py * py + pz * pz);
+    }
+
+    // Vector from seg_start to point
+    double px = point.x - seg_start.x;
+    double py = point.y - seg_start.y;
+    double pz = point.z - seg_start.z;
+
+    // Project point onto the line defined by the segment
+    // t represents the position along the segment (0 = start, 1 = end)
+    double t = (px * dx + py * dy + pz * dz) / segment_length_sq;
+
+    // Clamp t to [0, 1] to stay within the segment
+    t = std::max(0.0, std::min(1.0, t));
+
+    // Find the closest point on the segment
+    double closest_x = seg_start.x + t * dx;
+    double closest_y = seg_start.y + t * dy;
+    double closest_z = seg_start.z + t * dz;
+
+    // Compute distance from point to closest point on segment
+    double dist_x = point.x - closest_x;
+    double dist_y = point.y - closest_y;
+    double dist_z = point.z - closest_z;
+
+    return std::sqrt(dist_x * dist_x + dist_y * dist_y + dist_z * dist_z);
+}
+
+double DriftEvaluatorNode::computeXTE() {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+
+    if (actual_positions_.empty() || !planned_trajectory_
+        || planned_trajectory_->points.size() < 2) {
+        return 0.0;
+    }
+
+    // Use most recent position for XTE computation
+    const auto& [timestamp, actual_pos] = actual_positions_.back();
+
+    auto [idx1, idx2] = findClosestSegment(actual_pos);
+
+    if (planned_trajectory_->points[idx1].transforms.empty()
+        || planned_trajectory_->points[idx2].transforms.empty()) {
+        return 0.0;
+    }
+
+    geometry_msgs::msg::Point p1, p2;
+    p1.x = planned_trajectory_->points[idx1].transforms[0].translation.x;
+    p1.y = planned_trajectory_->points[idx1].transforms[0].translation.y;
+    p1.z = planned_trajectory_->points[idx1].transforms[0].translation.z;
+
+    p2.x = planned_trajectory_->points[idx2].transforms[0].translation.x;
+    p2.y = planned_trajectory_->points[idx2].transforms[0].translation.y;
+    p2.z = planned_trajectory_->points[idx2].transforms[0].translation.z;
+
+    double xte = pointToSegmentDistance(actual_pos, p1, p2);
+
+    return xte;
+}
+
+void DriftEvaluatorNode::computeAndPublishXTE() {
+    double xte = computeXTE();
+
+    // Create timestamped message
+    geometry_msgs::msg::PointStamped xte_msg;
+    xte_msg.header.stamp    = this->now();
+    xte_msg.header.frame_id = "world";
+    xte_msg.point.x         = xte;
+    xte_msg.point.y         = 0.0;
+    xte_msg.point.z         = 0.0;
+
+    xte_pub_->publish(xte_msg);
+
+    if (xte > 0.0) {
+        RCLCPP_INFO_THROTTLE(
+            this->get_logger(),
+            *this->get_clock(),
+            1000,
+            "Cross Track Error: %.4f m",
+            xte
         );
     }
 }
