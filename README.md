@@ -45,6 +45,20 @@ commande pour zoomer et suivre le drone :
 ign service -s /gui/follow --reqtype ignition.msgs.StringMsg --reptype ignition.msgs.Boolean --timeout 2000 --req 'data: "crazyflie"'
 ign service -s /gui/follow/offset --reqtype ignition.msgs.Vector3d --reptype ignition.msgs.Boolean --timeout 2000 --req 'x: -0.2, y: 0.0, z: 0.1'
 ```
+ou avec le nouveau CLI *gz* :
+```bash
+gz service -s /gui/follow \
+  --reqtype gz.msgs.StringMsg \
+  --reptype gz.msgs.Boolean \
+  --timeout 2000 \
+  --req 'data: "crazyflie"'
+
+gz service -s /gui/follow/offset \
+  --reqtype gz.msgs.Vector3d \
+  --reptype gz.msgs.Boolean \
+  --timeout 2000 \
+  --req 'x: -0.2, y: 0.0, z: 0.1'
+```
 
 commande pour kills les process:
 ```bash
