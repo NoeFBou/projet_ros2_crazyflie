@@ -10,59 +10,6 @@ from navigation3d_interfaces.action import FollowTrajectory
 from tf2_ros import Buffer, TransformListener
 
 
-class WaitGoal(py_trees.behaviour.Behaviour):
-    def __init__(self, name ="WaitGoal"):
-        super(WaitGoal, self).__init__(name)
-        self.name = name
-        self.node = None
-        self.subscriber = None
-        self.new_goal_received = False
-        self.goal_data = None
-
-        self.blackboard = py_trees.blackboard.Client(name=name, namespace="navigation3d")
-        self.blackboard.register_key(key="target_pose", access=py_trees.common.Access.WRITE)
-
-    def setup(self, **kwargs):
-        self.node: Node = kwargs.get('node')
-        self.subscriber = self.node.create_subscription(
-            PoseStamped,
-            self.node.get_parameter("target_topic").value,
-            self._callback,
-            10
-        )
-        return True
-
-    def _callback(self, msg):
-
-        p = msg.pose.position
-        self.node.get_logger().info(f"New target : x={p.x:.2f}, y={p.y:.2f}, z={p.z:.2f}")
-
-        self.goal_data = msg
-        self.new_goal_received = True
-
-    def initialise(self):
-        pass
-
-    def update(self):
-        if self.new_goal_received and self.goal_data:
-
-            target = [
-                self.goal_data.pose.position.x,
-                self.goal_data.pose.position.y,
-                self.goal_data.pose.position.z
-            ]
-            self.blackboard.target_pose = target
-
-            self.new_goal_received = False
-            self.node.get_logger().info(f"status blackboard: {self.blackboard.target_pose}")
-            self.node.get_logger().info(f"status new goal rec: {self.new_goal_received}")
-            return Status.SUCCESS
-
-        return Status.RUNNING
-
-    def terminate(self, new_status):
-        pass
-
 class TrajectoriesPlanner(py_trees.behaviour.Behaviour):
     def __init__(self, name="Plan Path"):
         super(TrajectoriesPlanner, self).__init__(name)
@@ -169,7 +116,7 @@ class ChangeHeight(py_trees.behaviour.Behaviour):
 
         if abs(error) < self.threshold:
             self.publisher.publish(Twist())
-            self.node.get_logger().info("Fin Décollage")
+            self.node.get_logger().info("fin decollage/atterissage")
 
             return Status.SUCCESS
 
@@ -262,3 +209,71 @@ class FollowTrajectoryBehavior(py_trees.behaviour.Behaviour):
             if self.result_future and not self.result_future.done():
                 self.node.get_logger().warn("cancel trajectory")
                 self.goal_handle.cancel_goal_async()
+
+class CheckNewGoalAvailable(py_trees.behaviour.Behaviour):
+    def __init__(self, name="CheckNewGoal"):
+        super(CheckNewGoalAvailable, self).__init__(name)
+        self.blackboard = py_trees.blackboard.Client(name=name, namespace="navigation3d")
+        self.blackboard.register_key(key="target_pose", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key(key="trajectory", access=py_trees.common.Access.WRITE)
+
+        self.node = None
+        self.sub = None
+        self.latest_msg = None
+        self.msg_processed = True
+
+    def setup(self, **kwargs):
+        self.node = kwargs.get('node')
+        self.sub = self.node.create_subscription(
+            PoseStamped,
+            self.node.get_parameter("target_topic").value,
+            self._cb,
+            10
+        )
+        return True
+
+    def _cb(self, msg):
+        self.latest_msg = msg
+        self.msg_processed = False # Nouveau goal frais !
+        self.node.get_logger().info("new goal")
+
+    def update(self):
+        if not self.msg_processed and self.latest_msg:
+            target = [
+                self.latest_msg.pose.position.x,
+                self.latest_msg.pose.position.y,
+                self.latest_msg.pose.position.z
+            ]
+            self.blackboard.target_pose = target
+            self.blackboard.trajectory = None
+
+            self.msg_processed = True
+            return Status.SUCCESS
+
+        return Status.FAILURE
+
+class CheckHasTrajectory(py_trees.behaviour.Behaviour):
+    def __init__(self, name="HasTraj?"):
+        super(CheckHasTrajectory, self).__init__(name)
+        self.blackboard = py_trees.blackboard.Client(name=name, namespace="navigation3d")
+        self.blackboard.register_key(key="trajectory", access=py_trees.common.Access.READ)
+
+    def update(self):
+        try:
+            traj = self.blackboard.trajectory
+            if traj is not None:
+                return Status.SUCCESS
+        except KeyError:
+            return Status.FAILURE
+
+        return Status.FAILURE
+
+class ClearTrajectory(py_trees.behaviour.Behaviour):
+    def __init__(self, name="ClearTraj"):
+        super(ClearTrajectory, self).__init__(name)
+        self.blackboard = py_trees.blackboard.Client(name=name, namespace="navigation3d")
+        self.blackboard.register_key(key="trajectory", access=py_trees.common.Access.WRITE)
+
+    def update(self):
+        self.blackboard.trajectory = None
+        return Status.SUCCESS
