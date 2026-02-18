@@ -26,6 +26,9 @@ private:
         geometry_msgs::msg::Point* actual_pos_out  = nullptr,
         geometry_msgs::msg::Point* closest_pos_out = nullptr
     );
+    double computeTDE();
+    void computeAndPublishTDE();
+
     geometry_msgs::msg::Point interpolatePlannedPosition(const rclcpp::Time& time);
     std::pair<size_t, size_t> findClosestSegment(const geometry_msgs::msg::Point& position);
     double pointToSegmentDistance(
@@ -41,6 +44,7 @@ private:
 
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr ade_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr xte_marker_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr tde_pub_;
 
     // Timer for periodic ADE computation
     rclcpp::TimerBase::SharedPtr timer_;

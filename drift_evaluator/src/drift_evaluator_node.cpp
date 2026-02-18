@@ -26,6 +26,7 @@ DriftEvaluatorNode::DriftEvaluatorNode() : Node("drift_evaluator_node") {
     ade_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/drift/ade", 10);
     xte_marker_pub_ =
         this->create_publisher<visualization_msgs::msg::Marker>("/drift/xte_marker", 10);
+    tde_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/drift/tde", 10);
 
     auto timer_period = std::chrono::duration<double>(1.0 / update_rate_);
 
@@ -34,6 +35,7 @@ DriftEvaluatorNode::DriftEvaluatorNode() : Node("drift_evaluator_node") {
         [this]() {
             this->computeAndPublishADE();
             this->computeAndPublishXTE();
+            this->computeAndPublishTDE();
         }
     );
 
@@ -378,6 +380,57 @@ void DriftEvaluatorNode::computeAndPublishXTE() {
             xte
         );
     }
+}
+
+double DriftEvaluatorNode::computeTDE() {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+
+    if (actual_positions_.empty() || !planned_trajectory_
+        || planned_trajectory_->points.size() < 2) {
+        return 0.0;
+    }
+
+    const auto& [timestamp, actual_pos] = actual_positions_.back();
+
+    // Find the closest segment to the current drone position
+    auto [idx1, idx2] = findClosestSegment(actual_pos);
+
+    const auto& pt1 = planned_trajectory_->points[idx1];
+    const auto& pt2 = planned_trajectory_->points[idx2];
+
+    // Average the time_from_start of the two segment endpoints
+    double t1            = pt1.time_from_start.sec + pt1.time_from_start.nanosec * 1e-9;
+    double t2            = pt2.time_from_start.sec + pt2.time_from_start.nanosec * 1e-9;
+    double expected_time = (t1 + t2) * 0.5;
+
+    // Actual elapsed time since trajectory start
+    rclcpp::Time traj_start_time = rclcpp::Time(planned_trajectory_->header.stamp);
+    double actual_elapsed        = (timestamp - traj_start_time).seconds();
+
+    // Positive = drone is late, negative = drone is ahead
+    return actual_elapsed - expected_time;
+}
+
+void DriftEvaluatorNode::computeAndPublishTDE() {
+    double tde = computeTDE();
+
+    geometry_msgs::msg::PointStamped tde_msg;
+    tde_msg.header.stamp    = this->now();
+    tde_msg.header.frame_id = "world";
+    tde_msg.point.x         = tde;
+    tde_msg.point.y         = 0.0;
+    tde_msg.point.z         = 0.0;
+
+    tde_pub_->publish(tde_msg);
+
+    RCLCPP_INFO_THROTTLE(
+        this->get_logger(),
+        *this->get_clock(),
+        1000,
+        "Temporal Deviation Error: %.4f s (%s)",
+        std::abs(tde),
+        tde >= 0.0 ? "late" : "ahead"
+    );
 }
 
 int main(int argc, char** argv) {
