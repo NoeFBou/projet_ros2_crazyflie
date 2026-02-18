@@ -41,7 +41,7 @@ class AStar:
         if self.map.is_occupied_astar(start_idx) or self.map.is_occupied_astar(goal_idx):
             return None
 
-        margins_to_try = [self.bbox_margin, self.bbox_margin * 4.0, float('inf')]
+        margins_to_try = [self.bbox_margin, self.bbox_margin * 4.0, 50.0]
 
         for i, margin in enumerate(margins_to_try):
             bounds = self._calculate_bounds(start_idx, goal_idx, margin)

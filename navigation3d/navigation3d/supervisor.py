@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from py_trees_ros import trees
 from py_trees.common import Status
-from navigation3d.behavior.action import WaitGoal, TrajectoriesPlanner, FollowTrajectoryBehavior,ChangeHeight
+from navigation3d.behavior.action import TrajectoriesPlanner, FollowTrajectoryBehavior,ChangeHeight,ClearTrajectory,CheckNewGoalAvailable,CheckHasTrajectory
 
 class Supervisor(Node):
     def __init__(self):
@@ -20,28 +20,36 @@ class Supervisor(Node):
         self.declare_parameter("speed_landing", -0.1)
         self.declare_parameter("frame_id", "map")
 
-    def setup_tree(self) :
+    def setup_tree(self):
+        bb = py_trees.blackboard.Client(name="Init", namespace="navigation3d")
+        bb.register_key(key="trajectory", access=py_trees.common.Access.WRITE)
+        bb.register_key(key="target_pose", access=py_trees.common.Access.WRITE)
 
+        bb.trajectory = None
+        bb.target_pose = None
         root = py_trees.composites.Selector(name="Supervisor", memory=False)
-        #branch batterie
-        #battery_branch = py_trees.composites.Sequence(name="battery branch", memory=True)
 
+        planning_branch = py_trees.composites.Sequence(name="PlanningBranch", memory=True)
 
-        #branche navigation
-        navigation_branch = py_trees.composites.Sequence(name="navigation branch", memory=True)
+        check_new_goal = CheckNewGoalAvailable(name="NewGoal?")
+        planner = TrajectoriesPlanner(name="Planner")
 
-        wait_goal = WaitGoal()
-        trajectory = TrajectoriesPlanner()
-        #check_battey_trajectory = CheckBatteryTrajectory()
-        takeoff = ChangeHeight(height = self.get_parameter("height_take_off").value)
-        follow_trajectory = FollowTrajectoryBehavior(name="Follow Trajectory")
-        land = ChangeHeight(height = self.get_parameter("height_landing").value)
+        planning_branch.add_children([check_new_goal, planner])
 
+        exec_branch = py_trees.composites.Sequence(name="ExecutionBranch", memory=True)
 
-        navigation_branch.add_children([wait_goal,trajectory, #check_battey_trajectory
-                                     takeoff, follow_trajectory,land])
+        has_traj = CheckHasTrajectory(name="HasTraj?")
+        takeoff = ChangeHeight(name="TakeOff", height=self.get_parameter("height_take_off").value)
+        follow = FollowTrajectoryBehavior(name="Follow")
+        land = ChangeHeight(name="Land", height=self.get_parameter("height_landing").value)
 
-        root.add_child(navigation_branch)
+        clear_traj = ClearTrajectory(name="ClearTraj")
+
+        exec_branch.add_children([has_traj, takeoff, follow, land, clear_traj])
+
+        idle = py_trees.behaviours.Running(name="Idle")
+
+        root.add_children([planning_branch, exec_branch, idle])
         return root
 
 def main():
