@@ -15,6 +15,7 @@ find_package(nav_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 include_directories(include)
 
@@ -30,6 +31,7 @@ ament_target_dependencies(drift_evaluator_node
   trajectory_msgs
   tf2
   tf2_geometry_msgs
+  visualization_msgs
 )
 
 install(TARGETS

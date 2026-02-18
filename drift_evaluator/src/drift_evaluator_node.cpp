@@ -24,7 +24,8 @@ DriftEvaluatorNode::DriftEvaluatorNode() : Node("drift_evaluator_node") {
     );
 
     ade_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/drift/ade", 10);
-    xte_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/drift/xte", 10);
+    xte_marker_pub_ =
+        this->create_publisher<visualization_msgs::msg::Marker>("/drift/xte_marker", 10);
 
     auto timer_period = std::chrono::duration<double>(1.0 / update_rate_);
 
@@ -249,7 +250,8 @@ DriftEvaluatorNode::findClosestSegment(const geometry_msgs::msg::Point& position
 double DriftEvaluatorNode::pointToSegmentDistance(
     const geometry_msgs::msg::Point& point,
     const geometry_msgs::msg::Point& seg_start,
-    const geometry_msgs::msg::Point& seg_end
+    const geometry_msgs::msg::Point& seg_end,
+    geometry_msgs::msg::Point* closest_point_out
 ) {
     // Vector from seg_start to seg_end
     double dx = seg_end.x - seg_start.x;
@@ -264,6 +266,11 @@ double DriftEvaluatorNode::pointToSegmentDistance(
         double px = point.x - seg_start.x;
         double py = point.y - seg_start.y;
         double pz = point.z - seg_start.z;
+
+        if (closest_point_out) {
+            *closest_point_out = seg_start;
+        }
+
         return std::sqrt(px * px + py * py + pz * pz);
     }
 
@@ -289,10 +296,20 @@ double DriftEvaluatorNode::pointToSegmentDistance(
     double dist_y = point.y - closest_y;
     double dist_z = point.z - closest_z;
 
+    // Return closest point to caller
+    if (closest_point_out) {
+        closest_point_out->x = closest_x;
+        closest_point_out->y = closest_y;
+        closest_point_out->z = closest_z;
+    }
+
     return std::sqrt(dist_x * dist_x + dist_y * dist_y + dist_z * dist_z);
 }
 
-double DriftEvaluatorNode::computeXTE() {
+double DriftEvaluatorNode::computeXTE(
+    geometry_msgs::msg::Point* actual_pos_out,
+    geometry_msgs::msg::Point* closest_pos_out
+) {
     std::lock_guard<std::mutex> lock(data_mutex_);
 
     if (actual_positions_.empty() || !planned_trajectory_
@@ -319,25 +336,40 @@ double DriftEvaluatorNode::computeXTE() {
     p2.y = planned_trajectory_->points[idx2].transforms[0].translation.y;
     p2.z = planned_trajectory_->points[idx2].transforms[0].translation.z;
 
-    double xte = pointToSegmentDistance(actual_pos, p1, p2);
+    geometry_msgs::msg::Point closest_point;
+    double xte = pointToSegmentDistance(actual_pos, p1, p2, &closest_point);
+
+    if (actual_pos_out) *actual_pos_out = actual_pos;
+    if (closest_pos_out) *closest_pos_out = closest_point;
 
     return xte;
 }
 
 void DriftEvaluatorNode::computeAndPublishXTE() {
-    double xte = computeXTE();
-
-    // Create timestamped message
-    geometry_msgs::msg::PointStamped xte_msg;
-    xte_msg.header.stamp    = this->now();
-    xte_msg.header.frame_id = "world";
-    xte_msg.point.x         = xte;
-    xte_msg.point.y         = 0.0;
-    xte_msg.point.z         = 0.0;
-
-    xte_pub_->publish(xte_msg);
+    geometry_msgs::msg::Point actual_pos, closest_pos;
+    double xte = computeXTE(&actual_pos, &closest_pos);
 
     if (xte > 0.0) {
+        visualization_msgs::msg::Marker marker;
+        marker.header.stamp    = this->now();
+        marker.header.frame_id = "crazyflie/odom";
+        marker.ns              = "xte";
+        marker.id              = 0;
+        marker.type            = visualization_msgs::msg::Marker::LINE_STRIP;
+        marker.action          = visualization_msgs::msg::Marker::ADD;
+
+        marker.scale.x = 0.02;
+
+        marker.color.r = 1.0f;
+        marker.color.g = 0.0f;
+        marker.color.b = 0.0f;
+        marker.color.a = 1.0f;
+
+        marker.points.push_back(actual_pos);
+        marker.points.push_back(closest_pos);
+
+        xte_marker_pub_->publish(marker);
+
         RCLCPP_INFO_THROTTLE(
             this->get_logger(),
             *this->get_clock(),
