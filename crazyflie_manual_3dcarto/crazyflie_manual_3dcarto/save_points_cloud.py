@@ -13,7 +13,7 @@ from std_msgs.msg import Bool
 class SavePCDNode(Node):
     def __init__(self):
         super().__init__('save_cloud_node')
-        self.points = []
+        self.points = set()
 
         # Publisher for the fake floor (to ensure octomap fills the ground)
         self.floor_pub = self.create_publisher(PointCloud2, '/my_3d_cloud', 10)
@@ -30,11 +30,11 @@ class SavePCDNode(Node):
 
         self.get_logger().info("Node ready. Press 1 (via /save_cloud) to save as .pcd.")
 
-        self.publish_fake_floor()
+        self.timer = self.create_timer(2.0, self.publish_fake_floor)
 
     def cloud_callback(self, msg):
         for p in pc2.read_points(msg, field_names=("x","y","z"), skip_nans=True):
-            self.points.append([p[0], p[1], p[2]])
+            self.points.add((p[0], p[1], p[2]))
 
     def publish_fake_floor(self):
         """
@@ -44,9 +44,9 @@ class SavePCDNode(Node):
         
         points = []
         # Configure floor size (e.g., from -5m to +5m)
-        min_x, max_x = -5.0, 5.0
-        min_y, max_y = -5.0, 5.0
-        step = 0.1 # Point density (10cm)
+        min_x, max_x = -3.0, 3.0
+        min_y, max_y = -3.0, 3.0
+        step = 0.05 # Point density (10cm)
         z_floor = 0.0 # Floor height
         x = min_x
         while x <= max_x:
@@ -68,8 +68,8 @@ class SavePCDNode(Node):
         
         # Add it to our local list for the PCD file
         for p in points:
-            self.points.append(p)
-            
+            self.points.add((p[0], p[1], p[2]))
+        self.get_logger().info(f"Fake floor published with {len(points)} points. Total points in buffer: {len(self.points)}")
         self.get_logger().info("Fake floor sent to Octomap and added to PCD buffer")
     def save_callback(self, msg):
         if msg.data:
@@ -81,7 +81,7 @@ class SavePCDNode(Node):
             self.get_logger().warn("No points to save.")
             return
 
-        arr = np.array(self.points, dtype=np.float32)
+        arr = np.array(list(self.points), dtype=np.float32)
         n = arr.shape[0]
         filename = "map.pcd"
 

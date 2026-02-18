@@ -1,8 +1,15 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+
 
 def generate_launch_description():
+	sim_arg = DeclareLaunchArgument(
+        'sim',
+        default_value='True'
+    )
 	return LaunchDescription([
 		Node(
 			package='octomap_server',
@@ -21,7 +28,9 @@ def generate_launch_description():
 			executable='scan_to_pcd',
 			name='scan_to_pcd',
 			output='screen',
-			parameters=[],
+			parameters=[{
+				'sim': LaunchConfiguration('sim')
+			}],
 		),
 		Node(
 			package='crazyflie_manual_3dcarto',

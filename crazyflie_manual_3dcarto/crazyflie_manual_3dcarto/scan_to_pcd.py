@@ -11,6 +11,7 @@ import math
 class ScanToPCDNode(Node):
     def __init__(self):
         super().__init__('scan_to_pcd_node')
+        self.declare_parameter('sim', True)  # Set to False if using real hardware
 
         # TF listener
         self.tf_buffer = Buffer()
@@ -18,6 +19,8 @@ class ScanToPCDNode(Node):
 
         # Subscriber LaserScan
         self.scan_sub = self.create_subscription(LaserScan,'/crazyflie/scan',self.scan_callback,10)
+        if not self.get_parameter('sim').get_parameter_value().bool_value:
+            self.scan_sub = self.create_subscription(LaserScan,'/crazyflie_real/scan',self.scan_callback,10)
 
         # Publisher PointCloud2
         self.cloud_pub = self.create_publisher(PointCloud2, '/my_3d_cloud', 10)
@@ -29,10 +32,13 @@ class ScanToPCDNode(Node):
         points_world = []
         try:
             source_frame_id = 'crazyflie/base_footprint'
+            if not self.get_parameter('sim').get_parameter_value().bool_value:
+                source_frame_id = msg.header.frame_id  # For real hardware, the frame might be different
+                self.map_frame = 'world'  # For real hardware, we assume the map frame is 'world'
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame,
                 source_frame_id,
-                msg.header.stamp,
+                rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.1)
             )
         except Exception as e:
