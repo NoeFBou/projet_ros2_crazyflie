@@ -7,11 +7,13 @@ GridIdx = Tuple[int, int, int]
 
 class OctomapReader:
 
-    def __init__(self,grid_res:float,inflation:float):
+    def __init__(self,grid_res:float, inflation_astar: float, inflation_minsnap: float):
         self.grid_res = grid_res
-        self.inflation = inflation
+        self.inflation_astar = inflation_astar
+        self.inflation_minsnap = inflation_minsnap
         self.occupied = set()
-        self.occupied_inflated  = set()
+        self.occupied_astar = set()
+        self.occupied_minsnap = set()
         self.map_ready = False
 
     def update_map(self, msg: PointCloud2):
@@ -24,11 +26,14 @@ class OctomapReader:
             occ.add((ix, iy, iz))
 
         self.occupied = occ
-        self.occupied_inflated = self._inflate(occ)
+        self.occupied_astar = self._inflate(occ, self.inflation_astar)
+        self.occupied_minsnap = self._inflate(occ, self.inflation_minsnap)
         self.map_ready = True
 
-    def is_occupied(self, idx: GridIdx) -> bool:
-        return idx in self.occupied_inflated
+    def is_occupied_astar(self, idx: GridIdx) -> bool:
+        return idx in self.occupied_astar
+    def is_occupied_minsnap(self, idx: GridIdx) -> bool:
+        return idx in self.occupied_minsnap
 
     #lit l 'octomap publié sous la forme d un nuage de point et la voxelise pour obtenir la grille d occupation
     def read_octomap(self, msg: PointCloud2) :#-> Set[GridIdx]:
@@ -44,12 +49,12 @@ class OctomapReader:
         self.occupied_inflated = self._inflate(occ)
         self.map_ready = True
 
-    def _inflate(self, occ: Set[GridIdx]) -> Set[GridIdx]:
+    def _inflate(self, occ: Set[GridIdx], radius: float) -> Set[GridIdx]:
 
-        if self.inflation <= 1e-6:
+        if radius <= 1e-6:
             return set(occ)
 
-        r = int(math.ceil(self.inflation / self.grid_res))
+        r = int(math.ceil(radius / self.grid_res))
         inflated: Set[GridIdx] = set()
 
         offsets = [(dx, dy, dz)

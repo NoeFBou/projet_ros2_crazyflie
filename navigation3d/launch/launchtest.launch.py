@@ -17,32 +17,25 @@ def generate_launch_description():
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     pkg_crazyflie_bringup = get_package_share_directory('ros_gz_crazyflie_bringup')
 
-    # path_to_models_source = os.path.join(
-    #     os.environ.get('HOME'),
-    #     'crazyflie_ws/src/ros_gz_crazyflie/ros_gz_crazyflie_gazebo/models/crazyflie'
-    # )
-    # robot_sdf_path = os.path.join(path_to_models_source, 'crazyflie', 'model.sdf')
-
-    models_parent_dir = os.path.join(
-        os.environ.get('HOME'),
-        'crazyflie_ws/src/ros_gz_crazyflie/ros_gz_crazyflie_gazebo/models'
-    )
-
-    robot_sdf_path = os.path.join(models_parent_dir, 'crazyflie', 'model.sdf')
+    model_folder = os.path.join(pkg_navigation3d, 'meshes', 'crazyflie')
+    robot_sdf_path = os.path.join(model_folder, 'model.sdf')
 
     if not os.path.exists(robot_sdf_path):
         print(f"fichier SDF introuvable : {robot_sdf_path}")
     else:
         print(f"Fichier SDF trouve")
 
-    params = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
-    rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config.rviz')
-    world_path = os.path.join(pkg_navigation3d, 'worlds', 'oui.sdf')
+    params_file = os.path.join(pkg_navigation3d, 'config', 'planner.yaml')
+    rviz_config_file = os.path.join(pkg_navigation3d, 'rviz', 'config5.rviz')
+    world_path = os.path.join(pkg_navigation3d, 'worlds', 'test2.sdf')
+    nav3d_meshes_dir = os.path.join(pkg_navigation3d, 'meshes')
+
     resource_paths = [
         os.path.join(pkg_navigation3d, 'worlds'), ':',
         os.path.join(pkg_crazyflie_bringup, 'models'), ':',
-        models_parent_dir
+        nav3d_meshes_dir
     ]
+
     set_env_vars = [
             #SetEnvironmentVariable(name='MESA_GL_VERSION_OVERRIDE', value='3.3'),
             #SetEnvironmentVariable(name='MESA_GLES_VERSION_OVERRIDE', value='3.3'),
@@ -56,17 +49,12 @@ def generate_launch_description():
             SetEnvironmentVariable(name='GZ_SIM_RESOURCE_PATH', value=resource_paths),
         ]
 
-    # gz_resource_path = SetEnvironmentVariable(
-    #     name='GZ_SIM_RESOURCE_PATH',
-    #     value=[
-    #         os.path.join(pkg_pointcloud_builder, 'worlds'), ':',
-    #         os.path.join(pkg_crazyflie_description, 'models'), ':',
-    #         '/home/test/crazyflie_ws/src/crazyflie-simulation/simulator_files/gazebo'
-    #     ]
-    # )
     with open(robot_sdf_path, 'r') as infp:
         robot_desc = infp.read()
-
+    common_params = [
+        params_file,
+        {'use_sim_time': True}
+    ]
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -121,16 +109,37 @@ def generate_launch_description():
         executable="planner",
         name="planner",
         output="screen",
-        parameters=[params],
+        parameters=common_params,
+    )
+    marker_pose = Node(
+        package="navigation3d",
+        executable="interactive_marker_pose_stamped",
+        name="interactive_marker_pose_stamped",
+        output="screen",
+        parameters=common_params,
     )
 
-    goal = Node(
+    traj_follower = Node(
         package="navigation3d",
-        executable="goal_manager",
-        name="goal_manager",
+        executable="trajectories_follower",
+        name="trajectories_follower",
         output="screen",
-        parameters=[params],
+        parameters=common_params,
     )
+    supervisor = Node(
+        package="navigation3d",
+        executable="supervisor",
+        name="supervisor",
+        output="screen",
+        parameters=common_params,
+    )
+    # goal = Node(
+    #     package="navigation3d",
+    #     executable="goal_manager",
+    #     name="goal_manager",
+    #     output="screen",
+    #     parameters=[params],
+    # )
 
     rviz2 = Node(
         package='rviz2',
@@ -147,13 +156,13 @@ def generate_launch_description():
         arguments=[
             '-name', 'crazyflie',
             '-file', robot_sdf_path,
-            '-x', '0.0',
+            '-x', '-2.0',
             '-y', '0.0',
             '-z', '0.05'
         ],
         output='screen'
     )
-    map_path = os.path.join(pkg_navigation3d, 'maps', 'fr_campus.bt')
+    map_path = os.path.join(pkg_navigation3d, 'maps', 'map.bt')
     octomap_server = Node(
         package='octomap_server',
         executable='octomap_server_node',
@@ -166,26 +175,19 @@ def generate_launch_description():
         }]
     )
 
-    # trajectories_follower = Node(
-    #     package='navigation3d',
-    #     executable='trajectories_follower',
-    #     name='trajectories_follower',
-    #     output='screen',
-    #     parameters=[params],
-    # )
-
     ld = LaunchDescription()
     for var in set_env_vars:
         ld.add_action(var)
-    ld.add_action(planner)
     ld.add_action(octomap_server)
     #ld.add_action(robot_state_publisher)  #se truck marche pas :(
-    ld.add_action(goal)
     ld.add_action(rviz2)
     ld.add_action(gazebo_sim)
     ld.add_action(bridge)
     ld.add_action(control)
     ld.add_action(simple_mapper)
     ld.add_action(spawn_robot)
-    #ld.add_action(trajectories_follower)
+    ld.add_action(planner)
+    ld.add_action(marker_pose)
+    ld.add_action(traj_follower)
+    ld.add_action(supervisor)
     return ld

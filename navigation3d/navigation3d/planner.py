@@ -30,31 +30,23 @@ class Planner(Node):
         self.declare_parameter("occupied_cloud_topic", "/octomap_point_cloud_centers")
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("grid_res", 0.20)          # meters 0.2
-        self.declare_parameter("inflation", 0.20)         # meters
+        self.declare_parameter("inflation_astar", 0.30)
+        self.declare_parameter("inflation_minsnap", 0.10)
         self.declare_parameter("bbox_margin", 1.0)        # meters
-        self.declare_parameter("start", [10.0, 0.0, 2.5])  # x,y,z
-        self.declare_parameter("goal",  [36.63155746459961, -60.41566467285156, 3.5])  # x,y,z
         self.declare_parameter("drone_mass", 0.032 )
         self.declare_parameter("sample_rate", 0.05)
         self.declare_parameter("avg_speed", 0.5)
-
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.declare_parameter("world_frame", "map")
         self.declare_parameter("robot_frame", "crazyflie/base_footprint")
         self.declare_parameter("goal_topic", "/goal_pose")
         self.declare_parameter("force_goal_z", -1.0)
-        # self.frame_id = self.get_parameter("frame_id").value
-        # self.step = 5
-        # qos_sub = QoSProfile(
-        #     reliability=QoSReliabilityPolicy.BEST_EFFORT,
-        #     history=QoSHistoryPolicy.KEEP_LAST,
-        #     depth=1,
-        # )
+        self.declare_parameter("height_take_off", 0.5)
 
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.map_reader = OctomapReader(
             grid_res=self.get_parameter("grid_res").value,
-            inflation=self.get_parameter("inflation").value
+            inflation_astar=self.get_parameter("inflation_astar").value,
+            inflation_minsnap=self.get_parameter("inflation_minsnap").value
         )
 
         qos_map = QoSProfile(
@@ -83,85 +75,29 @@ class Planner(Node):
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
         )
 
-        # self.path_basic = self.create_publisher(Path, "planned_path_astar_basic", latching_qos)
         self.marker_pub_basic = self.create_publisher(Marker, "planned_path_marker", latching_qos)
-
-        # self.path_pruned = self.create_publisher(Path, "planned_path_astar_pruned", latching_qos)
         self.marker_pub_pruned = self.create_publisher(Marker, "planned_path_marker_pruned", latching_qos)
-
-        # self.path_snaped_basic = self.create_publisher(Path, "planned_path_astar_Snaped_basic", latching_qos)
         self.marker_pub_snaped = self.create_publisher(Marker, "planned_path_marker_snaped", latching_qos)
-
-        # self.path_verified_basic = self.create_publisher(Path, "planned_path_Snaped_verif", latching_qos)
+        self.marker_pub_densify= self.create_publisher(Marker, "planned_path_marker_densify", latching_qos)
         self.marker_pub_verif = self.create_publisher(Marker, "planned_path_marker_snaped_verif", latching_qos)
-
         self.traj_pub = self.create_publisher(MultiDOFJointTrajectory, "planned_trajectory_final", latching_qos)
 
         self.occupied: Set[GridIdx] = set()
         self.occupied_inflated: Set[GridIdx] = set()
         self.map_ready = False
 
-
-
-        self.current_start = list(self.get_parameter("start").value)
-        self.current_goal = list(self.get_parameter("goal").value)
         self.bbox_margin = self.get_parameter("bbox_margin").value
 
-        # Replan when params change
-        self.add_on_set_parameters_callback(self._on_params)
         self.get_logger().info("Planner started. Waiting for occupied cloud...")
 
     def _occupied_cloud_callback(self, msg: PointCloud2):
         self.get_logger().info("Map received, updating grid...")
         self.map_reader.update_map(msg)
         self.map_ready = True
-        # if first time run planer
-        #self.planner()
 
-    # def load_octomap(self):
-    #     reader  = OctomapReader(self.get_parameter("grid_res").value,self.get_parameter("inflation").value, self.get_parameter("occupied_cloud_topic").value)
-    #     self.occupied=reader.read_octomap()
-    #     self.map_ready = True
-
-
-    #plan or replan when goal/grid are set or change
-    #tmp
-    def _on_params(self, params: List[Parameter]):
-        updated = False
-
-        for p in params:
-            if p.name == "start":
-                self.current_start = p.value
-                updated = True
-            elif p.name == "goal":
-                self.current_goal = p.value
-                updated = True
-            elif p.name == "grid_res" or p.name == "inflation" or p.name=="bbox_margin":
-
-                pass
-
-        if updated and self.map_ready:
-            #self.get_logger().info(f"Params update detected. New Goal: {self.current_goal}")
-            self.planner()
-
-        return SetParametersResult(successful=True)
-
-    # def _prune_path(self, path: List[GridIdx]) -> List[GridIdx]:
-    #     if len(path) < 3: return path
-    #     pruned = [path[0]]
-    #     old_dir = (path[1][0]-path[0][0], path[1][1]-path[0][1], path[1][2]-path[0][2])
-    #
-    #     for i in range(1, len(path) - 1):
-    #         cur, nxt = path[i], path[i+1]
-    #         new_dir = (nxt[0]-cur[0], nxt[1]-cur[1], nxt[2]-cur[2])
-    #         if new_dir != old_dir:
-    #             pruned.append(cur)
-    #             old_dir = new_dir
-    #     pruned.append(path[-1])
-    #     return pruned
     def get_drone_position(self) -> Optional[List[float]]:
 
-        world_frame = self.get_parameter("world_frame").value
+        world_frame = self.get_parameter("frame_id").value
         robot_frame = self.get_parameter("robot_frame").value
 
         try:
@@ -201,39 +137,108 @@ class Planner(Node):
         else:
             self.get_logger().warn("map not ready yet")
 
+    def _densify_path(self, path_idx: List[GridIdx], max_dist: float = 1.0) -> List[GridIdx]:
+        if len(path_idx) < 2:
+            return path_idx
 
-    def _prune_path(self, path: List[GridIdx]) -> List[GridIdx]:
+        # Conversion en points réels pour calculer les distances
+        points = [np.array(self.map_reader.grid_to_world(idx)) for idx in path_idx]
+
+        densified_indices = []
+        p0 = points[0]
+        p1 = points[1]
+        #anchor pour le debut
+        dist_start = np.linalg.norm(p1 - p0)
+        if dist_start > 0.5:
+            direction = (p1 - p0) / dist_start
+
+            anchor_pt = p0 + direction * 0.30
+            anchor_idx = self.map_reader.world_to_grid(anchor_pt)
+            densified_indices.append(anchor_idx)
+
+        for i in range(len(points) - 1):
+            p1 = points[i]
+            p2 = points[i+1]
+
+            dist = np.linalg.norm(p2 - p1)
+
+            if dist > max_dist:
+                num_segments = math.ceil(dist / max_dist)
+
+                for j in range(1, num_segments):
+                    alpha = j / num_segments
+                    new_pt_world = p1 + alpha * (p2 - p1)
+
+                    new_idx = self.map_reader.world_to_grid(new_pt_world)
+                    densified_indices.append(new_idx)
+
+            densified_indices.append(path_idx[i+1])
+
+        return densified_indices
+
+    def _rdp(self, path: List[GridIdx]) -> List[GridIdx]:
+        """
+        Ramer-Douglas-Peucker.
+        """
+
         if len(path) < 3: return path
 
-        pruned = [path[0]]
-        old_dir = (path[1][0]-path[0][0], path[1][1]-path[0][1], path[1][2]-path[0][2])
-        last_kept_idx = 0
-        max_segment_dist = 1.5
-        grid_res = self.get_parameter("grid_res").value
+        point_list = np.array([self.map_reader.grid_to_world(idx) for idx in path])
 
-        for i in range(1, len(path) - 1):
-            cur, nxt = path[i], path[i+1]
-            new_dir = (nxt[0]-cur[0], nxt[1]-cur[1], nxt[2]-cur[2])
+        # Epsilon : Tolérance de simplification. Supprime les points à moins de epsilon m de la ligne droite.
+        epsilon = 0.08
 
-            last_kept = path[last_kept_idx]
-            dist_sq = (cur[0]-last_kept[0])**2 + (cur[1]-last_kept[1])**2 + (cur[2]-last_kept[2])**2
-            dist_meters = math.sqrt(dist_sq) * grid_res
+        # Appel recursif
+        mask = self._rec_rdp(point_list, epsilon)
 
-            keep_point = False
+        pruned_path = [path[i] for i in range(len(path)) if mask[i]]
 
-            if new_dir != old_dir:
-                keep_point = True
+        return pruned_path
 
-            elif dist_meters > max_segment_dist:
-                keep_point = True
+    def _rec_rdp(self, points, epsilon):
+        dmax = 0.0
+        index = 0
+        end = len(points) - 1
 
-            if keep_point:
-                pruned.append(cur)
-                old_dir = new_dir
-                last_kept_idx = i
+        if end < 2:
+            return [True] * len(points)
 
-        pruned.append(path[-1])
-        return pruned
+        start_pt = points[0]
+        end_pt = points[end]
+
+        line_vec = end_pt - start_pt
+        line_len = np.linalg.norm(line_vec)
+
+        if line_len == 0:
+            return [True] * len(points)
+
+        line_unit = line_vec / line_len
+
+        vec_start_to_points = points[1:end] - start_pt
+
+        scalar_projections = np.dot(vec_start_to_points, line_unit)
+
+        proj_vecs = np.outer(scalar_projections, line_unit)
+
+        perp_vecs = vec_start_to_points - proj_vecs
+        dists = np.linalg.norm(perp_vecs, axis=1)
+
+        if len(dists) > 0:
+            dmax = np.max(dists)
+            index = np.argmax(dists) + 1
+
+        results = [False] * len(points)
+
+        if dmax > epsilon:
+            rec_results1 = self._rec_rdp(points[:index+1], epsilon)
+            rec_results2 = self._rec_rdp(points[index:], epsilon)
+
+            results = rec_results1[:-1] + rec_results2
+        else:
+            results[0] = True
+            results[-1] = True
+
+        return results
 
     def planner(self) -> None:
         real_pose = self.get_drone_position()
@@ -241,7 +246,12 @@ class Planner(Node):
         if real_pose:
             start = real_pose
             self.get_logger().info(f"Start set to Drone Position: {start}")
+            if start[2] < 0.3:
+                self.get_logger().warn(f"Drone au sol ({start[2]:.2f}m).")
+                start[2] = self.get_parameter("height_take_off").value
         else:
+            self.get_logger().warn(f"Drone TF not found")
+            return
             start = self.current_start
             self.get_logger().warn(f"Drone TF not found. Using param Start: {start}")
 
@@ -256,16 +266,22 @@ class Planner(Node):
         if not path_astar:
             self.get_logger().warn("A* failed: No path found.")
             return
+        astar_lenght = self._aster_lenght(path_astar)
 
 
         self.get_logger().info(f"A* found: {len(path_astar)} voxels")
         self._publish_grid_path(path_astar,  self.marker_pub_basic, ns="basic", color=(1.0, 0.0, 0.0))
 
-        path_pruned = self._prune_path(path_astar)
+        path_pruned = self._rdp(path_astar)
         self.get_logger().info(f"Pruned: {len(path_pruned)} waypoints")
         self._publish_grid_path(path_pruned, self.marker_pub_pruned, ns="pruned", color=(1.0, 1.0, 0.0))
 
-        waypoints = self._path_to_timed_waypoints(path_pruned) #path_pruned
+        path_densify = self._densify_path(path_pruned)
+        self.get_logger().info(f"Pruned: {len(path_densify)} waypoints")
+        self._publish_grid_path(path_densify, self.marker_pub_densify, ns="densify", color=(1.0, 1.0, 0.5))
+
+
+        waypoints = self._path_to_timed_waypoints(path_densify) #path_pruned
         path_snaped, _, _ = self.waypoint_to_trajectory(waypoints) #tmp
 
         self.get_logger().info(f"Trajectory generated: {len(path_snaped.position)} samples")
@@ -275,71 +291,137 @@ class Planner(Node):
         max_retries = 50
         path_verified, t_samples, acceleration = self.waypoint_to_trajectory(waypoints)
         for attempt in range(max_retries):
-            is_safe, waypoints = self._check_and_repair(path_verified, waypoints, path_astar)
-            if is_safe:
+            is_repaired, waypoints = self._check_and_repair(path_verified, waypoints, path_astar)
+
+            if is_repaired:
+                pass
+            else:
+                self.get_logger().error("Repair failed (Segment too small). Aborting planner.")
+                return
+
+            try:
+                res = self.waypoint_to_trajectory(waypoints)
+                if res[0] is None: raise ValueError("Solver failed")
+                path_verified, t_samples, acceleration = res
+            except ValueError:
+                self.get_logger().error("MinSnap crashed during repair loop.")
+                return
+
+            if self._is_trajectory_safe(path_verified):
                 self.get_logger().info(f"Trajectory valid after {attempt} repairs.")
                 break
-            else:
-                if attempt == max_retries - 1:
-                    self.get_logger().error("Max retries reached. Trajectory might be unsafe.")
-            path_verified, t_samples, acceleration = self.waypoint_to_trajectory(waypoints)
 
         self.get_logger().info(f"Trajectory generated: {len(path_verified.position)} samples")
         self._publish_trajectory(path_verified,  self.marker_pub_verif, ns="verif", color=(0.0, 1.0, 1.0))
+        min_snap_length = self._min_snap_lenght(path_verified)
+        if astar_lenght < 0.1:
+            ratio = 1.0
+        else:
+            ratio = min_snap_length / astar_lenght
 
+        self.get_logger().info(f"Check Traj: Len A*={astar_lenght:.2f}m, Len Snap={min_snap_length:.2f}m, Ratio={ratio:.2f}")
+
+        if ratio > 2.0:
+            self.get_logger().error(f"Trajectoire rejetée. Ratio: {ratio:.2f}")
+            return
         self.publish_final_trajectory(path_verified,t_samples, acceleration)
 
+    def _is_trajectory_safe(self, quad_traj):
+        for pos in quad_traj.position:
+            grid_idx = self.map_reader.world_to_grid(pos)
+            if self.map_reader.is_occupied_minsnap(grid_idx):
+                return False
+        return True
+
+    def _aster_lenght(self, path):
+        astar_length = 0.0
+        for i in range(len(path) - 1):
+            p1 = np.array(path[i])
+            p2 = np.array(path[i+1])
+            astar_length += np.linalg.norm(p2 - p1)
+        return astar_length
+    def _min_snap_lenght(self, quad_traj):
+        positions = quad_traj.position
+
+        diffs = np.diff(positions, axis=0)
+        dists = np.linalg.norm(diffs, axis=1)
+        minsnap_length = np.sum(dists)
+
+        return minsnap_length
 
     def _check_and_repair(self, quad_traj, current_waypoints: List[Waypoint], raw_astar_path: List[GridIdx]) -> Tuple[bool, List[Waypoint]]:
-
         positions = quad_traj.position
         times = np.linspace(0, current_waypoints[-1].time, len(positions))
 
         collision_idx = -1
 
+        #detection de collision
         for i, pos in enumerate(positions):
             grid_idx = self.map_reader.world_to_grid(pos)
-
-            if self.map_reader.is_occupied(grid_idx):
+            if self.map_reader.is_occupied_minsnap(grid_idx):
                 collision_idx = i
                 break
 
         if collision_idx == -1:
             return True, current_waypoints
 
-        self.get_logger().warn(f"Collision detected at t={times[collision_idx]:.2f}s! Repairing...")
-
+        #on cherche le point
+        collision_time = times[collision_idx]
         collision_pos = positions[collision_idx]
+
+        self.get_logger().warn(f"Collision at t={collision_time:.2f}s. Pos={collision_pos}")
+
+        # cherche le point A* le plus proche
         best_dist = float('inf')
         safest_grid_idx = None
-
         for idx in raw_astar_path:
             pt_world = np.array(self.map_reader.grid_to_world(idx))
             dist = np.linalg.norm(pt_world - collision_pos)
-
             if dist < best_dist:
                 best_dist = dist
                 safest_grid_idx = idx
 
-        safe_pos = np.array(self.map_reader.grid_to_world(safest_grid_idx))
+        if safest_grid_idx is None:
+            return False, current_waypoints
 
-        collision_time = times[collision_idx]
-        new_wp = Waypoint(time=collision_time, position=safe_pos)
+        safe_pos = np.array(self.map_reader.grid_to_world(safest_grid_idx))
 
         new_waypoints = []
         inserted = False
-        for wp in current_waypoints:
+        min_dt = 0.2
+        for i, wp in enumerate(current_waypoints):
+
             if not inserted and wp.time > collision_time:
-                new_waypoints.append(new_wp)
+
+                prev_wp = current_waypoints[i-1] if i > 0 else None
+
+                dt_before = collision_time - prev_wp.time if prev_wp else min_dt + 1
+                dt_after = wp.time - collision_time
+
+                if dt_before < min_dt or dt_after < min_dt:
+                    self.get_logger().warn("Cannot repair: Segment too small for insertion. Skipping repair.")
+                    #todo decaler les temps pour l insertion du point
+                    return False, current_waypoints
+
+                repair_wp = Waypoint(time=collision_time, position=safe_pos)
+
+                new_waypoints.append(repair_wp)
                 inserted = True
+
             new_waypoints.append(wp)
+
+        if not inserted:
+            pass
 
         return False, new_waypoints
 
     def _path_to_timed_waypoints(self, grid_path: List[GridIdx]) -> List[Waypoint]:
-        avg_speed = self.get_parameter("avg_speed").value
-        raw_points = [self.map_reader.grid_to_world(idx) for idx in grid_path]
+        # Vitesse max cible (m/s)
+        v_max = self.get_parameter("avg_speed").value
+        # Si trop faible (<0.5), risque de boucles. Si trop fort (>2.0), risque de décrochage.
+        a_max = 1.0
 
+        raw_points = [self.map_reader.grid_to_world(idx) for idx in grid_path]
         waypoints = []
         current_time = 0.0
 
@@ -350,41 +432,70 @@ class Planner(Node):
                 prev_pos = np.array(raw_points[i-1])
                 dist = np.linalg.norm(pos - prev_pos)
 
-                segment_time = dist / avg_speed
+
+                t_accel = v_max / a_max
+                dist_accel = 0.5 * a_max * (t_accel ** 2)
+
+                if dist < 2 * dist_accel:
+                    t_kinematic = 2 * math.sqrt(dist / a_max)
+                else:
+
+                    t_cruise_part = (dist - 2 * dist_accel) / v_max
+                    t_kinematic = 2 * t_accel + t_cruise_part
+
+
+                t_cruise = dist / max(v_max, 0.1)
+
+                angle_factor = 0.0
 
                 if i > 1:
                     prev_prev = np.array(raw_points[i-2])
                     v1 = prev_pos - prev_prev
                     v2 = pos - prev_pos
 
-                    norm_v1 = np.linalg.norm(v1)
-                    norm_v2 = np.linalg.norm(v2)
+                    n1 = np.linalg.norm(v1)
+                    n2 = np.linalg.norm(v2)
 
-                    if norm_v1 > 1e-6 and norm_v2 > 1e-6:
-                        dir1 = v1 / norm_v1
-                        dir2 = v2 / norm_v2
-                        dot_prod = np.dot(dir1, dir2)
-                        dot_prod = max(-1.0, min(1.0, dot_prod))
+                    if n1 > 1e-3 and n2 > 1e-3:
+                        dot = np.dot(v1/n1, v2/n2)
+                        dot = max(-1.0, min(1.0, dot))
+                        angle = math.acos(dot)
 
-                        angle = math.acos(dot_prod)
+                        angle_factor = angle / (math.pi / 2.0)
+                        angle_factor = max(0.0, min(1.0, angle_factor))
 
-                        segment_time += (angle * 2)  # Facteur 1.5 à ajuster
+                segment_time = t_cruise + (t_kinematic - t_cruise) * angle_factor
 
-                segment_time = max(segment_time, 0.5)
+                min_phys_time = math.sqrt(2 * dist / a_max) * 0.8
+                segment_time = max(segment_time, min_phys_time)
+
+                segment_time = max(segment_time, 0.1)
 
                 current_time += segment_time
 
+            vel = None
+            acc = None
+
             if i == 0 or i == len(raw_points) - 1:
-                wp = Waypoint(time=current_time, position=pos, velocity=[0,0,0], acceleration=[0,0,0])
+                vel = [0, 0, 0]
+                acc = [0, 0, 0]
+
+            if vel is not None:
+                wp = Waypoint(time=current_time, position=pos, velocity=vel, acceleration=acc)
             else:
                 wp = Waypoint(time=current_time, position=pos)
 
             waypoints.append(wp)
 
         return waypoints
+
     def waypoint_to_trajectory(self, waypoints):
 
-        traj_poly = generate_trajectory(waypoints, degree=7, idx_minimized_orders=4)
+        try:
+            traj_poly = generate_trajectory(waypoints, degree=7, idx_minimized_orders=4)
+        except ValueError as e:
+            self.get_logger().error(f"MinSnap Solver Failed: {e}")
+            return None, None, None
 
         t_total = waypoints[-1].time
         t_samples = np.arange(0, t_total, self.get_parameter("sample_rate").value)
@@ -394,14 +505,8 @@ class Planner(Node):
             t_samples,
             vehicle_mass=self.get_parameter("drone_mass").value
         )
-        #[positions, attitudes, velocities]
-        #attitude = [qx, qy, qz, qw]
-        #self.get_logger().info(f"Test={quad_traj.velocity}")
 
-
-        #accelration
         derivatives = compute_trajectory_derivatives(traj_poly, t_samples, 4)
-        #[Pos, Vel, Acc, Jerk]
         acceleration = derivatives[2]
 
         return quad_traj, t_samples, acceleration

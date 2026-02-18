@@ -8,7 +8,7 @@ from trajectory_msgs.msg import MultiDOFJointTrajectory
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 import tf_transformations
-from navigation3d.action import FollowTrajectory
+from navigation3d_interfaces.action import FollowTrajectory
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup
 
@@ -25,13 +25,13 @@ class TrajectoriesFollower(Node):
         self.declare_parameter("max_speed", 1.0)
         self.declare_parameter("period", 0.02) # 0.02 = 50Hz
         self._action_cb_group = ReentrantCallbackGroup()
-        self.trajectory = None
-        self.start_time = None
-        # self.tracking_active = False
-        self.index_lst_point=0
-
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.trajectory = None
+        self.start_time = None
+        self.index_lst_point=0
+
+
 
         self._action_server = ActionServer(
             self,
@@ -44,6 +44,7 @@ class TrajectoriesFollower(Node):
 
         self.pub_cmd = self.create_publisher(Twist, self.get_parameter("cmd_vel_topic").value, 10)
 
+    # --- CALLBACKS ACTION SERVER ---
     def goal_callback(self, goal_request):
         self.get_logger().info('new trajectory')
         return GoalResponse.ACCEPT
@@ -52,6 +53,62 @@ class TrajectoriesFollower(Node):
         self.get_logger().info('STOP')
         self.pub_cmd.publish(Twist())
         return CancelResponse.ACCEPT
+
+    async def execute_callback(self, goal_handle):
+        self.get_logger().info('Exécution de la trajectoire')
+        current_traj = goal_handle.request.trajectory
+        self.trajectory = current_traj
+        self.index_lst_point = 0
+
+        last_pt = self.trajectory.points[-1]
+        total_duration = last_pt.time_from_start.sec + last_pt.time_from_start.nanosec * 1e-9
+
+        self.start_time = self.get_clock().now()
+
+
+        period = self.get_parameter("period").value
+        rate = self.create_rate(1.0 / period)
+
+        feedback_msg = FollowTrajectory.Feedback()
+        result = FollowTrajectory.Result()
+
+        while rclpy.ok():
+
+            #cancel de la traj
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                self.pub_cmd.publish(Twist()) # Stop
+                result.success = False
+                result.message = "Trajectory cancel"
+                return result
+
+            now = self.get_clock().now()
+            time_elapsed = (now - self.start_time).nanoseconds * 1e-9
+
+            setpoint, finished = self.get_point_at_time(time_elapsed) #points en cours dans la traj
+
+            #stop
+            if finished:
+                self.pub_cmd.publish(Twist())
+                #last_pt_time = self.trajectory.points[-1].time_from_start.sec + self.trajectory.points[-1].time_from_start.nanosec * 1e-9
+                if time_elapsed > (total_duration + 1.0):
+                    self.get_logger().info("Trajectory Finished.")
+                    goal_handle.succeed()
+                    result.success = True
+                    result.message = "Arrive"
+                    return result
+            else:
+                self._compute_and_publish_control(setpoint)
+            #todo distance restante
+            feedback_msg.time_remaining = max(0.0, total_duration - time_elapsed)
+
+            goal_handle.publish_feedback(feedback_msg)
+            rate.sleep()
+
+        goal_handle.succeed()
+        result.success = True
+        result.message = "finish"
+        return result
 
     def get_point_at_time(self, time_from_start_sec):
 
@@ -130,99 +187,57 @@ class TrajectoriesFollower(Node):
         except (LookupException, ConnectivityException, ExtrapolationException):
             return None, None
 
-    async def execute_callback(self, goal_handle):
-        self.get_logger().info('Exécution de la trajectoire')
-        current_traj = goal_handle.request.trajectory
-        self.trajectory = current_traj
-        self.index_lst_point = 0
-        self.start_time = self.get_clock().now()
+    def _compute_and_publish_control(self, setpoint):
+        """
+        """
+        point_position, point_velocities, point_drone_dir, point_drone_dir_rot, point_accel = setpoint
 
-        feedback_msg = FollowTrajectory.Feedback()
-        result = FollowTrajectory.Result()
-        period = self.get_parameter("period").value
-        while rclpy.ok():
+        curr_pos, curr_yaw = self.get_drone_state()
+        if curr_pos is None:
+            self.get_logger().warn("Perte TF", throttle_duration_sec=1.0)
+            #self.pub_cmd.publish(Twist())
+        else:
+            pos_err = point_position - curr_pos
 
-            if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                self.pub_cmd.publish(Twist()) # Stop
-                result.success = False
-                result.message = "Trajectoiry cancel"
-                return result
-            now = self.get_clock().now()
-            time_elapsed = (now - self.start_time).nanoseconds * 1e-9
+            # Vitesse Désirée
+            kx = self.get_parameter("kp_xy").value
+            kz = self.get_parameter("kp_z").value
 
-            setpoint, finished = self.get_point_at_time(time_elapsed)
+            v_cmd_world = point_velocities +(point_accel * 0.1)+ np.array([
+                kx * pos_err[0],
+                kx * pos_err[1],
+                kz * pos_err[2]
+            ])
 
-            if finished:
-                self.pub_cmd.publish(Twist())
-                last_pt_time = self.trajectory.points[-1].time_from_start.sec + self.trajectory.points[-1].time_from_start.nanosec * 1e-9
-                if time_elapsed > (last_pt_time + 1.0):
-                    self.get_logger().info("Trajectory Finished.")
-                    goal_handle.succeed()
-                    result.success = True
-                    result.message = "Arrive"
-                    return result
-            else:
-                point_position, point_velocities, point_drone_dir, point_drone_dir_rot, point_accel = setpoint
+            # Erreur de Yaw
+            yaw_err = point_drone_dir - curr_yaw
+            yaw_err = math.atan2(math.sin(yaw_err), math.cos(yaw_err)) # Normalisation -pi, pi
 
-                curr_pos, curr_yaw = self.get_drone_state()
-                if curr_pos is None:
-                    self.get_logger().warn("Perte TF", throttle_duration_sec=1.0)
-                    #self.pub_cmd.publish(Twist())
-                else:
-                    pos_err = point_position - curr_pos
+            yaw_cmd = point_drone_dir_rot + self.get_parameter("kp_yaw").value * yaw_err
 
-                    # Vitesse Désirée
-                    kx = self.get_parameter("kp_xy").value
-                    kz = self.get_parameter("kp_z").value
+            #transformation monde to drone
+            c = math.cos(curr_yaw)
+            s = math.sin(curr_yaw)
 
-                    v_cmd_world = point_velocities +(point_accel * 0.1)+ np.array([
-                        kx * pos_err[0],
-                        kx * pos_err[1],
-                        kz * pos_err[2]
-                    ])
+            v_x_body =  c * v_cmd_world[0] + s * v_cmd_world[1]
+            v_y_body = -s * v_cmd_world[0] + c * v_cmd_world[1]
+            v_z_body = v_cmd_world[2]
 
-                    # Erreur de Yaw
-                    yaw_err = point_drone_dir - curr_yaw
-                    yaw_err = math.atan2(math.sin(yaw_err), math.cos(yaw_err)) # Normalisation -pi, pi
+            # secu
+            max_v = self.get_parameter("max_speed").value
+            norm_xy = math.sqrt(v_x_body**2 + v_y_body**2)
+            if norm_xy > max_v:
+                scale = max_v / norm_xy
+                v_x_body *= scale
+                v_y_body *= scale
 
-                    yaw_cmd = point_drone_dir_rot + self.get_parameter("kp_yaw").value * yaw_err
+            msg = Twist()
+            msg.linear.x = v_x_body
+            msg.linear.y = v_y_body
+            msg.linear.z = v_z_body
+            msg.angular.z = yaw_cmd
 
-                    c = math.cos(curr_yaw)
-                    s = math.sin(curr_yaw)
-
-                    v_x_body =  c * v_cmd_world[0] + s * v_cmd_world[1]
-                    v_y_body = -s * v_cmd_world[0] + c * v_cmd_world[1]
-                    v_z_body = v_cmd_world[2]
-
-                    # secu
-                    max_v = self.get_parameter("max_speed").value
-                    norm_xy = math.sqrt(v_x_body**2 + v_y_body**2)
-                    if norm_xy > max_v:
-                        scale = max_v / norm_xy
-                        v_x_body *= scale
-                        v_y_body *= scale
-
-                    msg = Twist()
-                    msg.linear.x = v_x_body
-                    msg.linear.y = v_y_body
-                    msg.linear.z = v_z_body
-                    msg.angular.z = yaw_cmd
-
-                    self.pub_cmd.publish(msg)
-                    #todo curr_pos est None
-            feedback_msg.time_remaining = 0.0 #todo
-
-            goal_handle.publish_feedback(feedback_msg)
-            #todo Rate
-            time.sleep(period)
-
-        goal_handle.succeed()
-        result.success = True
-        result.message = "finish"
-        return result
-
-
+            self.pub_cmd.publish(msg)
 
 def main():
     rclpy.init()
