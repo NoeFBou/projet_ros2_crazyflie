@@ -4,11 +4,11 @@
 
 DriftEvaluatorNode::DriftEvaluatorNode() : Node("drift_evaluator_node") {
     this->declare_parameter("update_rate", 10.0);
-    this->declare_parameter("max_history_size", 1000);
+    this->declare_parameter("history_duration_ms", 10000);
     this->declare_parameter("interpolation_tolerance", 0.1);
 
     update_rate_             = this->get_parameter("update_rate").as_double();
-    max_history_size_        = this->get_parameter("max_history_size").as_int();
+    history_duration_ms_     = this->get_parameter("history_duration_ms").as_int();
     interpolation_tolerance_ = this->get_parameter("interpolation_tolerance").as_double();
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -38,7 +38,7 @@ DriftEvaluatorNode::DriftEvaluatorNode() : Node("drift_evaluator_node") {
 
     RCLCPP_INFO(this->get_logger(), "Drift Evaluator Node initialized");
     RCLCPP_INFO(this->get_logger(), "Update rate: %.2f Hz", update_rate_);
-    RCLCPP_INFO(this->get_logger(), "Max history size: %zu", max_history_size_);
+    RCLCPP_INFO(this->get_logger(), "History duration: %ld ms", history_duration_ms_);
 }
 
 void DriftEvaluatorNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
@@ -51,7 +51,10 @@ void DriftEvaluatorNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr m
     actual_positions_.push_back(std::make_pair(timestamp, position));
 
     // Limit the history size
-    if (actual_positions_.size() > max_history_size_) {
+    rclcpp::Duration window = rclcpp::Duration::from_nanoseconds(
+        static_cast<int64_t>(history_duration_ms_) * 1'000'000LL
+    );
+    while (!actual_positions_.empty() && (timestamp - actual_positions_.front().first) > window) {
         actual_positions_.pop_front();
     }
 }
@@ -194,9 +197,10 @@ void DriftEvaluatorNode::computeAndPublishADE() {
             this->get_logger(),
             *this->get_clock(),
             1000,
-            "Average Displacement Error: %.4f m (based on %zu points)",
+            "Average Displacement Error: %.4f m (based on %zu points, in the last %ld ms)",
             ade,
-            actual_positions_.size()
+            actual_positions_.size(),
+            history_duration_ms_
         );
     }
 }

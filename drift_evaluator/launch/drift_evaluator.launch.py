@@ -11,10 +11,10 @@ def generate_launch_description():
         description='Rate at which to compute and publish ADE (Hz)'
     )
     
-    max_history_size_arg = DeclareLaunchArgument(
-        'max_history_size',
-        default_value='1000',
-        description='Maximum number of historical positions to keep'
+    history_duration_ms_arg = DeclareLaunchArgument(
+        'history_duration_ms',
+        default_value='10000',
+        description='Decay duration of points used during the ADE computation'
     )
     
     interpolation_tolerance_arg = DeclareLaunchArgument(
@@ -30,7 +30,7 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'update_rate': LaunchConfiguration('update_rate'),
-            'max_history_size': LaunchConfiguration('max_history_size'),
+            'history_duration_ms': LaunchConfiguration('history_duration_ms'),
             'interpolation_tolerance': LaunchConfiguration('interpolation_tolerance'),
         }],
         remappings=[
@@ -40,7 +40,7 @@ def generate_launch_description():
     
     return LaunchDescription([
         update_rate_arg,
-        max_history_size_arg,
+        history_duration_ms_arg,
         interpolation_tolerance_arg,
         drift_evaluator_node,
     ])

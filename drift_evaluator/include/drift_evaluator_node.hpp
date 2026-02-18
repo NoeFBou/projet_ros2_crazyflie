@@ -46,7 +46,7 @@ private:
     std::mutex data_mutex_;
 
     double update_rate_;             // Hz
-    size_t max_history_size_;
+    size_t history_duration_ms_;
     double interpolation_tolerance_; // seconds
 };
 
