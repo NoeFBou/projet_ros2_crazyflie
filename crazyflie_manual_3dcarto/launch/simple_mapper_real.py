@@ -7,11 +7,10 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Command
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 from launch_ros.actions import Node
-import xacro
-from launch_ros.parameter_descriptions import ParameterValue
+
 
 
 def generate_launch_description():
@@ -56,9 +55,9 @@ def generate_launch_description():
     )
 
     rviz_config_path = os.path.join(
-        pkg_manual,
+        get_package_share_directory('crazyflie_ros2_multiranger_bringup'),
         'config',
-        'rviz-real-config.rviz')
+        'real_mapping.rviz')
 
 
     rviz = Node(
@@ -82,8 +81,6 @@ def generate_launch_description():
         crazyflie_real,
         simple_mapper,
         crazyflie_vel_mux,
-        robot_state_publisher,
-        joint_state_publisher_gui,
         static_publisher,
         rviz
         ])
