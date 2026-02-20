@@ -55,9 +55,9 @@ def generate_launch_description():
     )
 
     rviz_config_path = os.path.join(
-        get_package_share_directory('crazyflie_ros2_multiranger_bringup'),
+        pkg_manual,
         'config',
-        'real_mapping.rviz')
+        'rviz-real-config.rviz')
 
 
     rviz = Node(
