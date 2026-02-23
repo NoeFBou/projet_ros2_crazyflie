@@ -34,11 +34,7 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
 ### Solutions retenues 
 - **Cartographie manuel** : L'utilisateur peut explorer l'environnement via les touches du clavier, et une touche unique ajoutée permet de suivre une trajectoire en tire-bouchon vers le haut afin d'imiter ce que pourrait faire un lidar 3D. L'utilisateur peut via une autre touche enregistrer l'environnement sous la forme d'une OctoMap (on cartographie en nuage de points puis on convertie ce nuage de points en OctoMap).
 
-
-
-https://github.com/user-attachments/assets/e58b41b4-0c4a-4441-92a3-9bc8f8a1ee95
-
-
+https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
 
 - **Définition d'un cible à atteindre** : L'utilisateur peut définir le position à atteindre avec un marker sur rviz.
 - **Génération d'une trajectoire** : Calcul d'une trajectoire entre le drone et la position cible. Cette étape utilise une méthode hybride combinant un algorithme discret (A*) et des algorithmes d’optimisation (Ramer-Douglas-Peucker et Minimum Snap).
