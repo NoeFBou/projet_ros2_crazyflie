@@ -33,7 +33,9 @@ Ce projet s'adresse principalement aux chercheurs, étudiants ou développeurs c
 Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'utilisation d'algorithmes d'échantillonnage continus (comme RRT), l'utilisation de grilles discrètes (voxels), ou la cartographie externe (caméras de motion capture). La gestion de la carte peut se faire via de simples nuages de points (lourds à traiter) ou des structures optimisées.
 ### Solutions retenues 
 - **Cartographie manuelle** : L'utilisateur peut explorer l'environnement via les touches du clavier, et une touche unique ajoutée permet de suivre une trajectoire en tire-bouchon vers le haut afin d'imiter ce que pourrait faire un lidar 3D. L'utilisateur peut via une autre touche enregistrer l'environnement sous la forme d'une OctoMap (on cartographie en nuage de points puis on convertit ce nuage de points en OctoMap).
+  
   https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
+  
 - **Définition d'une cible à atteindre** : L'utilisateur peut définir la position à atteindre avec un marker sur rviz.
 - **Génération d'une trajectoire** : Calcul d'un chemin optimal entre le drone et la position cible en utilisant une "pipeline" hybride en trois étapes :
     1. A* (Recherche discrète) : Trouve le chemin le plus court en se déplaçant de bloc en bloc (voxels) au sein de la carte 3D générée (l'espace discret).
