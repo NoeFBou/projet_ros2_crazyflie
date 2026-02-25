@@ -36,9 +36,12 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
   
   https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
 
-    Figure "tire-bouchoné réalisée : 
+    Figure "tire-bouchoné réalisée :
+  
   <img width="549" height="663" alt="bouhcon" src="https://github.com/user-attachments/assets/33bc36d6-dc19-4731-8722-7800f78a5a7b" />
+  
     Carte similée sur gazebo et carte 3D scannée:
+  
   <img width="1166" height="766" alt="real map" src="https://github.com/user-attachments/assets/c19cc068-2282-49c1-99c8-bf5cc4218c42" />
   <img width="1102" height="752" alt="map ocoto" src="https://github.com/user-attachments/assets/a11bb20a-0b5f-4bca-8220-fa5b4b880544" />
 
@@ -55,13 +58,16 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
   https://github.com/user-attachments/assets/e61b6c97-3860-4519-9b4a-9bd4ae787316
 
     Etapes de génération d'une trajectoire :
+  
   <img width="1920" height="1080" alt="etape traj" src="https://github.com/user-attachments/assets/e411742d-ee99-42ae-b78b-88798e3c3461" />
   <img width="1137" height="642" alt="traj imag ege" src="https://github.com/user-attachments/assets/cc007ed1-ebdb-43b7-a9ca-57082bb6670a" />
+  
 - **Décollage et atterrissage** automatique au départ et à l'arrivée d'une trajectoire
 
   https://github.com/user-attachments/assets/2d5d1837-0aba-426a-a9cb-f3fbbc0e72e3
 
-- **Suivi d'une trajectoire** générée précédemment 
+- **Suivi d'une trajectoire** générée précédemment
+- 
   <img width="695" height="517" alt="traj genere" src="https://github.com/user-attachments/assets/63274a60-d5c2-4596-9403-81af5e872575" />
   
   https://github.com/user-attachments/assets/704bd8d1-89f8-4e3e-8a9e-b0dd2d668827
