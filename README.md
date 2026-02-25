@@ -35,6 +35,11 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
 - **Cartographie manuelle** : L'utilisateur peut explorer l'environnement via les touches du clavier, et une touche unique ajoutée permet de suivre une trajectoire en tire-bouchon vers le haut afin d'imiter ce que pourrait faire un lidar 3D. L'utilisateur peut via une autre touche enregistrer l'environnement sous la forme d'une OctoMap (on cartographie en nuage de points puis on convertit ce nuage de points en OctoMap).
   
   https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
+
+  <img width="549" height="663" alt="bouhcon" src="https://github.com/user-attachments/assets/33bc36d6-dc19-4731-8722-7800f78a5a7b" />
+  <img width="1166" height="766" alt="real map" src="https://github.com/user-attachments/assets/c19cc068-2282-49c1-99c8-bf5cc4218c42" />
+  <img width="1102" height="752" alt="map ocoto" src="https://github.com/user-attachments/assets/a11bb20a-0b5f-4bca-8220-fa5b4b880544" />
+
   
 - **Définition d'une cible à atteindre** : L'utilisateur peut définir la position à atteindre avec un marker sur rviz.
 
@@ -47,13 +52,15 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
  
   https://github.com/user-attachments/assets/e61b6c97-3860-4519-9b4a-9bd4ae787316
 
+  <img width="1920" height="1080" alt="etape traj" src="https://github.com/user-attachments/assets/e411742d-ee99-42ae-b78b-88798e3c3461" />
+  <img width="1137" height="642" alt="traj imag ege" src="https://github.com/user-attachments/assets/cc007ed1-ebdb-43b7-a9ca-57082bb6670a" />
 - **Décollage et atterrissage** automatique au départ et à l'arrivée d'une trajectoire
 
   https://github.com/user-attachments/assets/2d5d1837-0aba-426a-a9cb-f3fbbc0e72e3
 
 - **Suivi d'une trajectoire** générée précédemment 
   <img width="695" height="517" alt="traj genere" src="https://github.com/user-attachments/assets/63274a60-d5c2-4596-9403-81af5e872575" />
-
+  
   https://github.com/user-attachments/assets/704bd8d1-89f8-4e3e-8a9e-b0dd2d668827
 
 - **Changement de cible dynamique** : L'utilisateur peut modifier la cible à la volée en cours de vol.
@@ -64,6 +71,9 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
     - Average Displacement Error, estimation globale dans l’espace et dans le temps
     - Cross Track Error, écart instantané orthogonal à la trajectoire
     - Temporal Deviation Error, met en évidence les variations de vitesse ou les retards
+
+  <img width="1920" height="1080" alt="derive" src="https://github.com/user-attachments/assets/1510b5a1-90d7-4d20-a780-a54b7496c864" />
+
 
 ## Positionnement des solutions par rapport à l'existant
 
