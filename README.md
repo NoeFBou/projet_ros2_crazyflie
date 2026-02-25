@@ -37,12 +37,24 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
   https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
   
 - **Définition d'une cible à atteindre** : L'utilisateur peut définir la position à atteindre avec un marker sur rviz.
+
+  https://github.com/user-attachments/assets/077a10f6-e3d0-4ba3-81b2-27f24c17d919
+
 - **Génération d'une trajectoire** : Calcul d'un chemin optimal entre le drone et la position cible en utilisant une "pipeline" hybride en trois étapes :
     1. A* (Recherche discrète) : Trouve le chemin le plus court en se déplaçant de bloc en bloc (voxels) au sein de la carte 3D générée (l'espace discret).
     2. Ramer-Douglas-Peucker (RDP) (Simplification) : Optimise le chemin brut généré par A* en supprimant les points de passage redondants ou inutiles.(notamment les escaliers dans les diagonales)
     3. Minimum Snap (Lissage) : Transforme les segments anguleux restants en courbes fluides. Cela évite les arrêts brutaux et les mouvements saccadés.
+ 
+  https://github.com/user-attachments/assets/e61b6c97-3860-4519-9b4a-9bd4ae787316
+
 - **Décollage et atterrissage** automatique au départ et à l'arrivée d'une trajectoire
+
+  https://github.com/user-attachments/assets/2d5d1837-0aba-426a-a9cb-f3fbbc0e72e3
+
 - **Changement de cible dynamique** : L'utilisateur peut modifier la cible à la volée en cours de vol.
+
+  https://github.com/user-attachments/assets/c2534f25-48a6-4d14-a8cd-f372ec89eac4
+
 - **Calcul de dérive** : Évaluation de la dérive du drone en comparant la trajectoire réellement effectuée avec la trajectoire générée initialement. Trois métriques complémentaires sont utilisées :
     - Average Displacement Error, estimation globale dans l’espace et dans le temps
     - Cross Track Error, écart instantané orthogonal à la trajectoire
