@@ -51,6 +51,11 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
 
   https://github.com/user-attachments/assets/2d5d1837-0aba-426a-a9cb-f3fbbc0e72e3
 
+- **Suivi d'une trajectoire** générée précédemment 
+  <img width="695" height="517" alt="traj genere" src="https://github.com/user-attachments/assets/63274a60-d5c2-4596-9403-81af5e872575" />
+
+  https://github.com/user-attachments/assets/704bd8d1-89f8-4e3e-8a9e-b0dd2d668827
+
 - **Changement de cible dynamique** : L'utilisateur peut modifier la cible à la volée en cours de vol.
 
   https://github.com/user-attachments/assets/c2534f25-48a6-4d14-a8cd-f372ec89eac4
