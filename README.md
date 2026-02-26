@@ -8,7 +8,7 @@ Encadrant : Gérald Rocher (Gerald.ROCHER@univ-cotedazur.fr)
 ## Présentation du sujet 
 
 ### Contexte
-Le [Crazyflie 2.1+ de Bitcraze](https://www.bitcraze.io/products/crazyflie-2-1-plus/) est un nano-drone modulaire et open-source. Sa taille réduite en fait une plateforme idéale pour expérimenter à moindre coût. Il est équipé d'un [multi-ranger deck](https://www.bitcraze.io/products/multi-ranger-deck/) pour mesurer la distance aux objets tout autour du drone grâce à 4 capteurs laser, il est aussi équipé du [flow deck](https://www.bitcraze.io/products/flow-deck-v2/) permettant pour mesurer les mouvements et la distance par rapport au sol.
+Le [Crazyflie 2.1+ de Bitcraze](https://www.bitcraze.io/products/crazyflie-2-1-plus/) est un nano-drone modulaire et open-source. Sa taille réduite en fait une plateforme idéale pour expérimenter à moindre coût. Il est équipé d'un [multi-ranger deck](https://www.bitcraze.io/products/multi-ranger-deck/) pour mesurer la distance aux objets tout autour du drone grâce à 4 capteurs laser, il est aussi équipé du [flow deck](https://www.bitcraze.io/products/flow-deck-v2/) permettant de mesurer les mouvements et la distance par rapport au sol.
 
 L’objectif de ce projet est de cartographier l’environnement en 3D avec des capteurs limités, de générer et de suivre une trajectoire en 3D et d’identifier les dérives comportementales par rapport aux trajectoires générées. D'abord en simulation puis des tests sur le vrai drone.
 
@@ -36,11 +36,11 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
   
   https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
 
-    Figure "tire-bouchoné réalisée :
+    Figure "tire-bouchon" réalisée :
   
   <img width="549" height="663" alt="bouhcon" src="https://github.com/user-attachments/assets/33bc36d6-dc19-4731-8722-7800f78a5a7b" />
   
-    Carte similée sur gazebo et carte 3D scannée:
+    Carte simulée sur gazebo et carte 3D scannée:
   
   <img width="1166" height="766" alt="real map" src="https://github.com/user-attachments/assets/c19cc068-2282-49c1-99c8-bf5cc4218c42" />
   <img width="1102" height="752" alt="map ocoto" src="https://github.com/user-attachments/assets/a11bb20a-0b5f-4bca-8220-fa5b4b880544" />
@@ -50,7 +50,7 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
 
   https://github.com/user-attachments/assets/077a10f6-e3d0-4ba3-81b2-27f24c17d919
 
-- **Génération d'une trajectoire** : Calcul d'un chemin optimal entre le drone et la position cible en utilisant une "pipeline" hybride en trois étapes :
+- **Génération d'une trajectoire** : Calcul d'un chemin optimal entre le drone et la position cible en utilisant un "pipeline" hybride en trois étapes :
     1. A* (Recherche discrète) : Trouve le chemin le plus court en se déplaçant de bloc en bloc (voxels) au sein de la carte 3D générée (l'espace discret).
     2. Ramer-Douglas-Peucker (RDP) (Simplification) : Optimise le chemin brut généré par A* en supprimant les points de passage redondants ou inutiles.(notamment les escaliers dans les diagonales)
     3. Minimum Snap (Lissage) : Transforme les segments anguleux restants en courbes fluides. Cela évite les arrêts brutaux et les mouvements saccadés.
@@ -94,17 +94,17 @@ Le choix de l'octomap pour représenter l'environnement a été décidé par l'a
 Pour le développement  de la méthode de navigation, plusieurs grandes familles d'algorithmes s'offraient à nous :  les algorithmes basés sur l'échantillonnage (ex:RRT), les algorithmes de recherche discrète sur  graphe (ex:A*,Dijkstra), les algorithmes réactifs, les méthodes heuristiques ou encore l'apprentissage(Machine Learning/RL).
 
 Sachant que l'application tourne sur nos ordinateurs, nous voulions privilégier une méthode garantissant que le chemin généré soit sans collision tout en effectuant la trajectoire la plus courte possible jusqu'à la cible. 
-Pour ces raisons, nous avons écarté les approches heuristiques et réactifs, souvent sujettes aux minima locaux.
-De plus, notre nano-drone n'étant équipé que de capteurs très limités (infrarouges et flux optique), il a fallu également éliminer les approches par apprentissage car elles nécessitent beaucoup de données capteur pour la phase d'apprentissage(souvent des données caméra qui plus est).
+Pour ces raisons, nous avons écarté les approches heuristiques et réactives, souvent sujettes aux minima locaux.
+De plus, notre nano-drone n'étant équipé que de capteurs très limités (infrarouges et flux optique), il a fallu également éliminer les approches par apprentissage car elles nécessitent beaucoup de données capteur pour la phase d'apprentissage (souvent des données caméra qui plus est).
 Enfin, notre choix s'est porté sur un algorithme de recherche discrète plutôt que sur l'échantillonnage. La recherche discrète offre des résultats plus précis, répétables (déterministes) et nous assure mathématiquement de trouver le chemin le plus court tout en évitant les obstacles connus de la carte. 
 
-Ensuite, il a fallu chosir parmi les algorithmes de recherche lequel implémenter et nous avons opté pour A*. 
+Ensuite, il a fallu choisir parmi les algorithmes de recherche lequel implémenter et nous avons opté pour A*. 
 - Face à Dijkstra ce dernier explore l'espace de manière isotrope ce qui n'est pas pertinent et juste plus gourmand en ressource CPU.  
 - D*/ D lite sont conçus pour des environnements dynamiques, en permettant une replanification rapide lorsqu'un nouvel obstacle apparaît, sans avoir à recalculer toute la trajectoire depuis le début. Cependant, notre cahier des charges repose sur l'hypothèse d'un environnement statique. Utiliser D* aurait ajouté une complexité d'implémentation
-- JPS lui est conçu pour fonctionner avec une grille 2D alors que nous, on a besoin d'etre en 3D.
+- JPS lui est conçu pour fonctionner avec une grille 2D alors que notre système nécessite d'opérer en 3D.
 
 Explication de la pipeline de génération de trajectoires : A* -> RDP(Ramer-Douglas-Peucker) -> Minimum-snap
-- A* : nous avons choisi A* car il garantit de trouver le chemin le plus court dans un espace discrétisé (comme la grille de voxels générée par notre OctoMap). Pour minimiser le temps de calcul , nous recherchons la trajectoire dans un espace bornée entre la cible à atteindre et le drone et si aucun chemin n'est trouvé dans cet espace, nous effectuions  une recherche avec des bornes plus élargies dans la grille (configurable dans le [fichier config du package de navigation](https://github.com/NoeFBou/projet_ros2_crazyflie/blob/main/navigation3d/config/planner.yaml))
+- A* : nous avons choisi A* car il garantit de trouver le chemin le plus court dans un espace discrétisé (comme la grille de voxels générée par notre OctoMap). Pour minimiser le temps de calcul , nous recherchons la trajectoire dans un espace borné entre la cible à atteindre et le drone et si aucun chemin n'est trouvé dans cet espace, nous effectuons  une recherche avec des bornes plus élargies dans la grille (configurable dans le [fichier config du package de navigation](https://github.com/NoeFBou/projet_ros2_crazyflie/blob/main/navigation3d/config/planner.yaml))
 
     <details>
     <summary><b>Détail du fonctionnement de notre A*</b></summary>
@@ -115,7 +115,7 @@ Explication de la pipeline de génération de trajectoires : A* -> RDP(Ramer-Dou
         - **Optimisation par Bounding Box :** Pour éviter que A* ne sature le CPU en explorant toute la carte, nous limitons d'abord la recherche à une "bounding box" englobant le départ et l'arrivée (avec une marge configurable). Si aucun chemin n'est trouvé, cette zone de recherche s'étend dynamiquement (marge x4, puis limite maximale de 50m).
     </details>
 
-- L'algorithme de Ramer-Douglas-Peucker : A* génère des chemins dits "en escalier" très dur à suivre pour le drone. Pour pallier ce problème, nous appliquons RDP. Cet algorithme filtre et supprime les points redondants ou quasi-alignés.
+- L'algorithme de Ramer-Douglas-Peucker : A* génère des chemins dits "en escalier" très durs à suivre pour le drone. Pour pallier ce problème, nous appliquons RDP. Cet algorithme filtre et supprime les points redondants ou quasi-alignés.
 
     <details>
     <summary><b>Détail du fonctionnement de RDP </b></summary>
@@ -126,7 +126,7 @@ Explication de la pipeline de génération de trajectoires : A* -> RDP(Ramer-Dou
         - **Seuil de tolérance ($\epsilon$) :** Dans notre implémentation, tout point situé à une distance inférieure à $\epsilon = 0.08$ mètre de la ligne droite est considéré comme redondant et est supprimé. Si la distance dépasse $\epsilon$, le point est conservé et l'algorithme s'applique récursivement sur les nouveaux sous-segments.
     </details>
 
-- L'optimisation "Minimum Snap" permet de relier nos points de notre trajectoire simplifiés en générant une courbe polynomiale lisse. En minimisant le "Snap", on minimise les arrêts brutaux du drône et on rend la trajectoire plus fluide
+- L'optimisation "Minimum Snap" permet de relier nos points de notre trajectoire simplifiée en générant une courbe polynomiale lisse. En minimisant le "Snap", on minimise les arrêts brutaux du drone et on rend la trajectoire plus fluide
 
     <details>
     <summary><b>Fonctionnement de la librairie pour minimum snap</b></summary>
@@ -140,7 +140,7 @@ Explication de la pipeline de génération de trajectoires : A* -> RDP(Ramer-Dou
     </details>
 
 Explication du superviseur : pour suivre les trajectoires générées, nous utilisons un behavior tree.
-Il s'occupe de générer la trajectoire à partir des données de l'octomap et des positions du drone et de la cible à atteindre. Il gère ensuite le suivi de la trajectoire générée  par le drone. Il decolle et atterrit en début et fin de trajectoire quand c'est nécessaire et l'utilisateur a la capacité  de changer la cible à atteindre pendant qu'une trajectoire en cours de suivi.
+Il s'occupe de générer la trajectoire à partir des données de l'octomap et des positions du drone et de la cible à atteindre. Il gère ensuite le suivi de la trajectoire générée  par le drone. Il décolle et atterrit en début et fin de trajectoire quand c'est nécessaire et l'utilisateur a la capacité  de changer la cible à atteindre pendant qu'une trajectoire est en cours de suivi.
 Pour aller plus loin, vous pouvez consulter les schémas suivants pour mieux comprendre les étapes de notre superviseur : 
 [Voir le diagramme](#diagramme-visuel-de-larbre-de-comportement-du-superviseur-de-la-navigation-3d)
 [Voir le flux de décision](#flux-de-décision-du-superviseur-de-la-navigation-3d)
@@ -163,13 +163,13 @@ Pour aller plus loin, vous pouvez consulter les schémas suivants pour mieux com
 
 ### Le processus de réalisation du projet
 Le développement de ce projet a suivi les étapes suivantes : 
-1. Réalisation d'un état de l'art sur : la localisation dans l'espace, sur les représentation de l'environnement en 3d et sur les algorithmes de navigation pour drone quadrimoteurs.[liens de l'état de l'art réalisé](https://github.com/NoeFBou/projet_ros2_crazyflie/blob/main/ressource/Etat%20de%20l'art.pdf)
+1. Réalisation d'un état de l'art sur : la localisation dans l'espace, sur les représentations de l'environnement en 3d et sur les algorithmes de navigation pour drone quadrimoteurs.[liens de l'état de l'art réalisé](https://github.com/NoeFBou/projet_ros2_crazyflie/blob/main/ressource/Etat%20de%20l'art.pdf)
 2. Développement d'un moyen de cartographier l'environnement avec les capteurs présents sur le drone en simulation
 3. Développement d'un générateur de trajectoire avec l'algorithme A*
-4. Integration de la méthode du minimium snap pour améliorer la courbe générée précédement 
-5. Developpement d'un noeud de calcul de dérive de la trajectoire 
+4. Intégration de la méthode du minimium snap pour améliorer la courbe générée précédemment 
+5. Développement d'un noeud de calcul de dérive de la trajectoire 
 6. Ajout de l'algorithme de Ramer-Douglas-Peucker pour lisser la courbe générée par A*
-7. Développment du superviseur pour suivre la trajectoire générée
+7. Développement du superviseur pour suivre la trajectoire générée
 8. Test de la cartographie dans le monde réel
 
 
@@ -179,11 +179,11 @@ Ce projet ouvre la voie à des développements plus poussés :
     - **Algorithmes continus :** Explorer des approches basées sur l'échantillonnage optimal (comme RRT*) ou des méthodes bio-inspirées pour la planification dans des environnements non cartographiés.
     - **Replanification locale :** Intégrer un planificateur local (ex: DWA 3D ou TEB) pour gérer l'évitement d'obstacles dynamiques, en complément de notre planificateur global (A*).
     - **Contrôle Prédictif :** Améliorer le contrôleur de vol(le noeud qui suit la trajectoire) pour compenser les dérives comportementales en temps réel, notamment face aux perturbations (vent).
-    - **Correction dynamique de la trajectoire généré :** utiliser les métriques de dérive calculées pour ajuster la trajectoire générée à la volée.
+    - **Correction dynamique de la trajectoire générée :** utiliser les métriques de dérive calculées pour ajuster la trajectoire générée à la volée.
 - **Passage de la simulation à la réalité** pour la stack de navigation et de dérives comportementales
 - Cartographie Avancée :
     - **SLAM 3D Autonome :** Passer d'une cartographie manuelle à une approche SLAM (Simultaneous Localization and Mapping), permettant au drone de découvrir et naviguer simultanément.
-    - **Fusion de capteurs externe :** Coupler le système avec un système de capture de mouvement (OptiTrack/Vicon) pour l'évaluation des dérives, ou utiliser la caméra pour la cartographie.
+    - **Fusion de capteurs externes :** Coupler le système avec un système de capture de mouvement (OptiTrack/Vicon) pour l'évaluation des dérives, ou utiliser la caméra pour la cartographie.
 - Robotique Multi-Agents (Swarm):
     - **Cartographie collaborative :** Déployer un essaim de nano-drones pour fusionner plusieurs nuages de points locaux en une seule OctoMap globale
     - **Navigation en formation :** Implémenter des algorithmes de *flocking* pour permettre à plusieurs drones de naviguer de concert dans le même espace 3D sans collision inter-agents, ou de se suivre dynamiquement.(inspirée des comportements qu'on retrouve dans la nature)
@@ -196,13 +196,13 @@ Ce projet ouvre la voie à des développements plus poussés :
 
 - Flow deck v2 : https://www.bitcraze.io/products/flow-deck-v2/
 
-- Librairie utilisé pour le minimun-snap : https://github.com/Hs293Go/minsnap_trajectories
+- Librairie utilisée pour le minimun-snap : https://github.com/Hs293Go/minsnap_trajectories
 
 
 # Structure du Répertoire
 ```
 ├── crazyflie_manual_3dcarto package #package de la cartographie
-│   ├── config # paramètre de rviz et des noeuds 
+│   ├── config # paramètres de rviz et des noeuds 
 │   ├── crazyflie_manual_3dcarto
 │   │   ├── save_points_cloud.py #noeud de sauvegarde du nuage de point 
 │   │   ├── scan_to_pcd.py #noeud de conversion du nuage de point
@@ -224,7 +224,7 @@ Ce projet ouvre la voie à des développements plus poussés :
 │   │   ├── supervisor.py #noeud superviseur
 │   │   └── trajectories_follower.py #noeud pour suivre une trajectoire
 │   ├── rviz #config de rviz pour la navigation
-│   └── worlds # map utilisé dans la simulation
+│   └── worlds # map utilisée dans la simulation
 └── navigation3d_interfaces #utilitaire pour le noeud de suivi de la trajectoire
 ```
 
