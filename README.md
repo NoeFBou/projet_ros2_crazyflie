@@ -88,14 +88,17 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
 ## Positionnement des solutions par rapport à l'existant
 
 ### Choix de la méthode de cartographie 
+
 Pour la cartographie, là où notre état de l'art parlait souvent des LiDAR 3D ou des caméras RGB-D, notre drone ne possède que 4 lasers unidirectionnels (multi-ranger deck). Pour compenser, nous simulons le balayage spatial d'un LiDAR par un vol ascendant en tire-bouchon afin de capturer l'environnement le plus justement possible en 3D.
 
 ### Choix de l'octomap pour représenter l'environnement
-Le choix de l'OctoMap pour représenter l'environnement a été dicté par nos contraintes matérielles et logicielles :
+
+Le choix de l'OctoMap a été dicté par nos contraintes matérielles et logicielles :
 - Optimisation de la mémoire : Contrairement à un nuage de points brut qui est très lourd à stocker et à traiter, l'OctoMap compresse l'espace en regroupant les voxels vides ou pleins.
 - Compatibilité avec A :* L'algorithme A* ayant besoin d'un espace discrétisé (une grille) pour calculer ses nœuds, la structure en voxels 3D de l'OctoMap s'intègre parfaitement pour générer nos trajectoires.
 
 ### Choix de la méthode de navigation 3D
+
 Pour le développement  de la méthode de navigation, plusieurs grandes familles d'algorithmes s'offraient à nous :  les algorithmes basés sur l'échantillonnage (ex:RRT), les algorithmes de recherche discrète sur  graphe (ex:A*,Dijkstra), les algorithmes réactifs, les méthodes heuristiques ou encore l'apprentissage(Machine Learning/RL).
 
 Sachant que l'application tourne sur nos ordinateurs, nous voulions privilégier une méthode garantissant que le chemin généré soit sans collision tout en effectuant la trajectoire la plus courte possible jusqu'à la cible. 
@@ -109,6 +112,7 @@ Ensuite, il a fallu choisir parmi les algorithmes de recherche lequel implément
 - JPS lui est conçu pour fonctionner avec une grille 2D alors que notre système nécessite d'opérer en 3D.
 
 ### Explication de la pipeline de génération de trajectoires
+
 A* -> RDP(Ramer-Douglas-Peucker) -> Minimum-snap
 - A* : nous avons choisi A* car il garantit de trouver le chemin le plus court dans un espace discrétisé (comme la grille de voxels générée par notre OctoMap). Pour minimiser le temps de calcul , nous recherchons la trajectoire dans un espace borné entre la cible à atteindre et le drone et si aucun chemin n'est trouvé dans cet espace, nous effectuons  une recherche avec des bornes plus élargies dans la grille (configurable dans le [fichier config du package de navigation](https://github.com/NoeFBou/projet_ros2_crazyflie/blob/main/navigation3d/config/planner.yaml))
 
@@ -146,6 +150,7 @@ A* -> RDP(Ramer-Douglas-Peucker) -> Minimum-snap
     </details>
 
 ### Explication du superviseur 
+
 Pour suivre les trajectoires générées, nous utilisons un behavior tree.
 Il s'occupe de générer la trajectoire à partir des données de l'octomap et des positions du drone et de la cible à atteindre. Il gère ensuite le suivi de la trajectoire générée  par le drone. Il décolle et atterrit en début et fin de trajectoire quand c'est nécessaire et l'utilisateur a la capacité  de changer la cible à atteindre pendant qu'une trajectoire est en cours de suivi.
 Pour aller plus loin, vous pouvez consulter les schémas suivants pour mieux comprendre les étapes de notre superviseur : 
