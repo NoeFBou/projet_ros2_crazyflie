@@ -383,6 +383,12 @@ source install/setup.bash
 ros2 launch navigation3d launchtest.launch.py
 ```
 
+Vous pouvez également préciser le monde et l'octomap à charger comme ça : 
+```bash
+ros2 launch navigation3d navigation.launch.py world_file:=/home/test/crazyflie_ws/src/projet_ros2_crazyflie/navigation3d/worlds/test2.sdf map_file:=/home/test/crazyflie_ws/src/projet_ros2_crazyflie/navigation3d/maps/map.bt
+```
+
+
 Commandes pour zoomer et suivre le drone dans Gazebo :
 ```bash
 ign service -s /gui/follow --reqtype ignition.msgs.StringMsg --reptype ignition.msgs.Boolean --timeout 2000 --req 'data: "crazyflie"'
