@@ -145,6 +145,90 @@ Pour aller plus loin, vous pouvez consulter les schémas suivants pour mieux com
 [Voir le diagramme](#diagramme-visuel-de-larbre-de-comportement-du-superviseur-de-la-navigation-3d)
 [Voir le flux de décision](#flux-de-décision-du-superviseur-de-la-navigation-3d)
 
+### Choix de la méthode d’évaluation de la dérive
+
+L’évaluation de la dérive devait permettre de quantifier de manière claire et exploitable l’écart entre la trajectoire planifiée et la trajectoire réellement suivie par le drone. Plutôt que de nous limiter à une simple distance instantanée, nous avons choisi une approche complémentaire reposant sur trois indicateurs : l’**Average Displacement Error (ADE)**, le **Cross-Track Error (XTE)** et le **Temporal Deviation Error (TDE)**.
+
+Ce choix s’explique par la volonté de couvrir les trois dimensions du problème : l’erreur globale accumulée dans le temps (ADE), l’écart spatial minimal à la trajectoire indépendamment du timing (XTE), et le décalage temporel par rapport au profil prévu (TDE). Une unique métrique n’aurait pas permis de distinguer, par exemple, un drone légèrement décalé mais à l’heure, d’un drone parfaitement aligné spatialement mais en retard.
+
+L’ADE repose sur une interpolation temporelle de la trajectoire planifiée afin de comparer, à chaque mesure d’odométrie, la position réelle et la position attendue au même instant. Le XTE, lui, s’appuie sur une projection géométrique du point réel sur les segments successifs de la trajectoire, ce qui permet d’obtenir la distance minimale à la courbe discrétisée. Enfin, le TDE estime à quel instant théorique correspond la position actuelle du drone sur la trajectoire et compare ce temps attendu au temps réellement écoulé depuis le début de l’exécution.
+
+<details>
+    <summary><b>Formule des différentes métriques</b></summary>
+
+#### Average Displacement Error (ADE)
+
+Soit :
+
+* $\mathbf{p}_a(t_i)$ la position réelle du drone à l’instant $t_i$
+* $\mathbf{p}_p(t_i)$ la position planifiée interpolée au même instant
+* $N$ le nombre d’échantillons
+
+Formule :
+
+$\mathrm{ADE} = \frac{1}{N} \sum_{i=1}^{N} \left| \mathbf{p}_a(t_i) - \mathbf{p}_p(t_i) \right|$
+
+Norme euclidienne en 3D :
+
+$\left| \mathbf{p}_a - \mathbf{p}_p \right| = \sqrt{(x_a - x_p)^2 + (y_a - y_p)^2 + (z_a - z_p)^2}$
+
+---
+
+#### Cross-Track Error (XTE)
+
+Soit :
+
+* $\mathbf{p}_a$ la position actuelle du drone
+* $\mathbf{s}_1, \mathbf{s}_2$ les deux points définissant le segment de trajectoire le plus proche
+
+Vecteur du segment :
+
+$\mathbf{d} = \mathbf{s}_2 - \mathbf{s}_1$
+
+Paramètre de projection :
+
+$t = \frac{(\mathbf{p}_a - \mathbf{s}_1) \cdot \mathbf{d}}{\| \mathbf{d} \|^2}$
+
+Saturation sur le segment :
+
+$t = \min(1, \max(0, t))$
+
+Point projeté sur le segment :
+
+$\mathbf{p}_{proj} = \mathbf{s}_1 + t \cdot \mathbf{d}$
+
+Cross-Track Error :
+
+$$\text{XTE} = \| \mathbf{p}_a - \mathbf{p}_{proj} \|$$
+
+---
+
+#### Temporal Deviation Error (TDE)
+
+Soit :
+
+* $t_{actual}$ le temps réel écoulé depuis le début de la trajectoire
+* $t_1, t_2$ les temps associés aux deux points du segment le plus proche
+
+Temps attendu sur la trajectoire :
+
+$t_{expected} = \frac{t_1 + t_2}{2}$
+
+Temporal Deviation Error :
+
+$\mathrm{TDE} = t_{actual} - t_{expected}$
+
+Interprétation :
+
+* $\mathrm{TDE} > 0$ → drone en retard
+* $\mathrm{TDE} < 0$ → drone en avance
+
+---
+
+</details>
+
+Cette combinaison permet une analyse plus fine du comportement du drone : stabilité du suivi, dérive latérale, retard ou avance dynamique.
+
 ## Travail réalisé : Produit et Processus
 ### Le Produit (Fonctionnalités livrées)
 
@@ -239,7 +323,7 @@ Ce projet ouvre la voie à des développements plus poussés :
 ```bash
 sudo apt update
 cd ~/crazyflie_ws/src/
-git clone https://github.com/NoeFBou/projet_ros2_crazyflie.git
+git clone --recursive https://github.com/NoeFBou/projet_ros2_crazyflie.git
 sudo apt install -y ros-humble-desktop ros-humble-octomap ros-humble-octomap-server ros-humble-octomap-rviz-plugins ros-humble-tf-transformations ros-humble-py-trees ros-humble-py-trees-ros ros-humble-interactive-markers
 sudo apt install python3-pip
 pip3 install numpy scipy transforms3d
@@ -304,6 +388,20 @@ gz service -s /gui/follow/offset \
   --timeout 2000 \
   --req 'x: -0.2, y: 0.0, z: 0.1'
 ```
+
+- Lancement de l'évaluation de la dérive en **simulation** :
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+# lancement avec les valeurs par défaut
+ros2 launch drift_evaluator drift_evaluator.launch.py
+# ou lancement en précisant des valeurs pour les arguments du launch file
+ros2 launch drift_evaluator drift_evaluator.launch.py \
+    update_rate:=20.0 \
+    history_duration_ms:=5000 \
+    interpolation_tolerance:=0.05
+```
+Vous pouvez obtenir des détails pour les différents arguments ![ici](./drift_evaluator/launch/drift_evaluator.launch.py).
 
 Pour changer de monde simulé et/ou d'octomap chargé, vous pouvez modifier le chemin dans le fichier launch de la partie navigation
 
