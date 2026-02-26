@@ -103,7 +103,8 @@ Ensuite, il a fallu choisir parmi les algorithmes de recherche lequel implément
 - D*/ D lite sont conçus pour des environnements dynamiques, en permettant une replanification rapide lorsqu'un nouvel obstacle apparaît, sans avoir à recalculer toute la trajectoire depuis le début. Cependant, notre cahier des charges repose sur l'hypothèse d'un environnement statique. Utiliser D* aurait ajouté une complexité d'implémentation
 - JPS lui est conçu pour fonctionner avec une grille 2D alors que notre système nécessite d'opérer en 3D.
 
-Explication de la pipeline de génération de trajectoires : A* -> RDP(Ramer-Douglas-Peucker) -> Minimum-snap
+### Explication de la pipeline de génération de trajectoires
+A* -> RDP(Ramer-Douglas-Peucker) -> Minimum-snap
 - A* : nous avons choisi A* car il garantit de trouver le chemin le plus court dans un espace discrétisé (comme la grille de voxels générée par notre OctoMap). Pour minimiser le temps de calcul , nous recherchons la trajectoire dans un espace borné entre la cible à atteindre et le drone et si aucun chemin n'est trouvé dans cet espace, nous effectuons  une recherche avec des bornes plus élargies dans la grille (configurable dans le [fichier config du package de navigation](https://github.com/NoeFBou/projet_ros2_crazyflie/blob/main/navigation3d/config/planner.yaml))
 
     <details>
@@ -139,7 +140,8 @@ Explication de la pipeline de génération de trajectoires : A* -> RDP(Ramer-Dou
         - **Sécurité et Réparation :** Puisque le lissage "arrondit" les angles, il arrive que la courbe lisse coupe un obstacle. Notre planificateur intègre une fonction `_check_and_repair` : il vérifie la trajectoire finale point par point. S'il détecte une collision, il force l'ajout d'un nouveau point de passage (le voxel sûr le plus proche) et relance l'optimisation mathématique.
     </details>
 
-Explication du superviseur : pour suivre les trajectoires générées, nous utilisons un behavior tree.
+### Explication du superviseur 
+Pour suivre les trajectoires générées, nous utilisons un behavior tree.
 Il s'occupe de générer la trajectoire à partir des données de l'octomap et des positions du drone et de la cible à atteindre. Il gère ensuite le suivi de la trajectoire générée  par le drone. Il décolle et atterrit en début et fin de trajectoire quand c'est nécessaire et l'utilisateur a la capacité  de changer la cible à atteindre pendant qu'une trajectoire est en cours de suivi.
 Pour aller plus loin, vous pouvez consulter les schémas suivants pour mieux comprendre les étapes de notre superviseur : 
 [Voir le diagramme](#diagramme-visuel-de-larbre-de-comportement-du-superviseur-de-la-navigation-3d)
