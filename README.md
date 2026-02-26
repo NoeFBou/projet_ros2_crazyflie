@@ -33,6 +33,7 @@ Ce projet s'adresse principalement aux chercheurs, étudiants ou développeurs c
 Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'utilisation d'algorithmes d'échantillonnage continus (comme RRT), l'utilisation de grilles discrètes (voxels), ou la cartographie externe (caméras de motion capture). La gestion de la carte peut se faire via de simples nuages de points (lourds à traiter) ou des structures optimisées.
 ### Solutions retenues 
 - **Cartographie manuelle** : L'utilisateur peut explorer l'environnement via les touches du clavier, et une touche unique ajoutée permet de suivre une trajectoire en tire-bouchon vers le haut afin d'imiter ce que pourrait faire un lidar 3D. L'utilisateur peut via une autre touche enregistrer l'environnement sous la forme d'une OctoMap (on cartographie en nuage de points puis on convertit ce nuage de points en OctoMap).
+  Une OctoMap est une représentation 3D de l'environnement basée sur des "octrees" (arbres octaux), qui divise l'espace en petits voxels pour modéliser les zones libres, occupées et inconnues.
   
   https://github.com/user-attachments/assets/856f0f26-4b23-4b09-af26-58c4cc180a4e
 
@@ -88,7 +89,11 @@ Pour la navigation 3D avec capteurs limités, plusieurs approches existent : l'u
 
 ### Choix de la méthode de cartographie 
 Pour la cartographie, là où notre état de l'art parlait souvent des LiDAR 3D ou des caméras RGB-D, notre drone ne possède que 4 lasers unidirectionnels (multi-ranger deck). Pour compenser, nous simulons le balayage spatial d'un LiDAR par un vol ascendant en tire-bouchon afin de capturer l'environnement le plus justement possible en 3D.
-Le choix de l'octomap pour représenter l'environnement a été décidé par l'algorithme de navigation choisi.
+
+### Choix de l'octomap pour représenter l'environnement
+Le choix de l'OctoMap pour représenter l'environnement a été dicté par nos contraintes matérielles et logicielles :
+- Optimisation de la mémoire : Contrairement à un nuage de points brut qui est très lourd à stocker et à traiter, l'OctoMap compresse l'espace en regroupant les voxels vides ou pleins.
+- Compatibilité avec A :* L'algorithme A* ayant besoin d'un espace discrétisé (une grille) pour calculer ses nœuds, la structure en voxels 3D de l'OctoMap s'intègre parfaitement pour générer nos trajectoires.
 
 ### Choix de la méthode de navigation 3D
 Pour le développement  de la méthode de navigation, plusieurs grandes familles d'algorithmes s'offraient à nous :  les algorithmes basés sur l'échantillonnage (ex:RRT), les algorithmes de recherche discrète sur  graphe (ex:A*,Dijkstra), les algorithmes réactifs, les méthodes heuristiques ou encore l'apprentissage(Machine Learning/RL).
@@ -281,6 +286,8 @@ Ce projet ouvre la voie à des développements plus poussés :
 - Multi-ranger deck : https://www.bitcraze.io/products/multi-ranger-deck/
 
 - Flow deck v2 : https://www.bitcraze.io/products/flow-deck-v2/
+
+- documentation d'octomap : https://octomap.github.io/ et https://github.com/OctoMap/octomap
 
 - Librairie utilisée pour le minimun-snap : https://github.com/Hs293Go/minsnap_trajectories
 
