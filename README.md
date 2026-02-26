@@ -104,7 +104,7 @@ Pour le développement  de la méthode de navigation, plusieurs grandes familles
 Sachant que l'application tourne sur nos ordinateurs, nous voulions privilégier une méthode garantissant que le chemin généré soit sans collision tout en effectuant la trajectoire la plus courte possible jusqu'à la cible. 
 Pour ces raisons, nous avons écarté les approches heuristiques et réactives, souvent sujettes aux minima locaux.
 De plus, notre nano-drone n'étant équipé que de capteurs très limités (infrarouges et flux optique), il a fallu également éliminer les approches par apprentissage car elles nécessitent beaucoup de données capteur pour la phase d'apprentissage (souvent des données caméra qui plus est).
-Enfin, notre choix s'est porté sur un algorithme de recherche discrète plutôt que sur l'échantillonnage. La recherche discrète offre des résultats plus précis, répétables (déterministes) et nous assure mathématiquement de trouver le chemin le plus court tout en évitant les obstacles connus de la carte. 
+Enfin, notre choix s'est porté sur un algorithme de recherche discrète plutôt que sur l'échantillonnage. La recherche discrète offre des résultats plus précis, répétables (déterministes) et nous assure mathématiquement de trouver le chemin le plus court tout en évitant les obstacles connus de la carte. L'un de nos objectifs étant de mesurer les dérives comportementales, le répétabilité de nos courbes générées est important.
 
 Ensuite, il a fallu choisir parmi les algorithmes de recherche lequel implémenter et nous avons opté pour A*. 
 - Face à Dijkstra ce dernier explore l'espace de manière isotrope ce qui n'est pas pertinent et juste plus gourmand en ressource CPU.  
